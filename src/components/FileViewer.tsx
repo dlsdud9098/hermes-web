@@ -12,10 +12,14 @@ import { markdown } from '@codemirror/lang-markdown';
 import {
   livePreviewPlugin, markdownStylePlugin, editorTheme,
   mouseSelectingField, collapseOnSelectionFacet,
+  codeBlockField, initHighlighter,
 } from 'codemirror-live-markdown';
 import { loadLanguage } from '@uiw/codemirror-extensions-langs';
 import { readFile, writeFile, type FileContent } from '../api/fs';
 import { useSettings } from '../store/settings';
+
+// 코드블록 신택스 하이라이터 1회 초기화 (lowlight)
+void initHighlighter();
 
 /** 확장자 → @uiw/codemirror-extensions-langs 언어 키 */
 const EXT_LANG: Record<string, string> = {
@@ -71,6 +75,7 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
           mouseSelectingField,
           livePreviewPlugin,
           markdownStylePlugin,
+          codeBlockField({ copyButton: true }),
           editorTheme,
         );
       }
