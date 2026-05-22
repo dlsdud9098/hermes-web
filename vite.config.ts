@@ -64,9 +64,8 @@ function fsBrowserPlugin(): Plugin {
           const dir = url.searchParams.get('path') || os.homedir()
           try {
             const abs = path.resolve(dir)
-            const entries = fs
-              .readdirSync(abs, { withFileTypes: true })
-              .filter((e) => !e.name.startsWith('.'))
+            // 숨김 파일·폴더(dotfile)도 모두 포함
+            const entries = fs.readdirSync(abs, { withFileTypes: true })
             const byName = (a: { name: string }, b: { name: string }) =>
               a.name.localeCompare(b.name)
             const dirs = entries

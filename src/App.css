@@ -331,6 +331,7 @@
 }
 .fileviewer-pre { margin: 0; padding: 10px; }
 .fileviewer-pre code.hljs { font-size: 12px; background: transparent; padding: 0; }
+.fileviewer-md { padding: 12px 16px; }
 
 .chat-error {
   color: #f7768e;
