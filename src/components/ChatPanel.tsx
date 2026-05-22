@@ -2,13 +2,21 @@
 // 컴포저에서 '/' 로 시작하면 스킬 자동완성 메뉴가 뜬다 (Claude Code 식).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { streamRun, HermesApiError } from '../api/hermes';
+import { streamRun, approveRun, HermesApiError } from '../api/hermes';
 import { listSkills, type Skill } from '../api/skills';
 import { useProjects } from '../store/projects';
 import { SkillMenu } from './SkillMenu';
 import { Markdown } from './Markdown';
 import { ToolCard } from './ToolCard';
+import { ApprovalCard } from './ApprovalCard';
 import type { ChatMessage, ToolCall } from '../types';
+
+interface PendingApproval {
+  runId: string;
+  command: string;
+  description: string;
+  choices: string[];
+}
 
 /** tool-end 이벤트를 받아 마지막 running 상태의 동명 툴을 완료 처리 */
 function completeTool(tools: ToolCall[], tool: string, duration: number, error: boolean): ToolCall[] {
@@ -39,6 +47,8 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skillIndex, setSkillIndex] = useState(0);
   const [menuDismissed, setMenuDismissed] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
+  const [approvalBusy, setApprovalBusy] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -112,6 +122,15 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
             ...assistant,
             tools: completeTool(assistant.tools ?? [], ev.tool, ev.duration, ev.error),
           };
+        } else if (ev.type === 'approval') {
+          setPendingApproval({
+            runId: ev.runId,
+            command: ev.command,
+            description: ev.description,
+            choices: ev.choices,
+          });
+        } else if (ev.type === 'approval-resolved') {
+          setPendingApproval(null);
         } else if (ev.type === 'done') {
           if (!assistant.content && ev.output) assistant = { ...assistant, content: ev.output };
         } else if (ev.type === 'error') {
@@ -130,12 +149,26 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
       }
     } finally {
       setStreaming(false);
+      setPendingApproval(null);
       abortRef.current = null;
     }
   }
 
   function stop() {
     abortRef.current?.abort();
+  }
+
+  async function handleApprove(choice: string) {
+    if (!pendingApproval) return;
+    setApprovalBusy(true);
+    try {
+      await approveRun(pendingApproval.runId, choice);
+      setPendingApproval(null); // 서버가 런을 재개하면 SSE 이벤트가 이어진다
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setApprovalBusy(false);
+    }
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -189,6 +222,15 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
             </div>
           </div>
         ))}
+        {pendingApproval && (
+          <ApprovalCard
+            command={pendingApproval.command}
+            description={pendingApproval.description}
+            choices={pendingApproval.choices}
+            busy={approvalBusy}
+            onChoose={handleApprove}
+          />
+        )}
         {error && <div className="chat-error">⚠ {error}</div>}
       </div>
       <div className="chat-composer">

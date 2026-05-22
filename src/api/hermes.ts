@@ -30,6 +30,8 @@ export type RunEvent =
   | { type: 'tool-start'; tool: string; preview: string }
   | { type: 'tool-end'; tool: string; duration: number; error: boolean }
   | { type: 'text'; delta: string }
+  | { type: 'approval'; runId: string; command: string; description: string; choices: string[] }
+  | { type: 'approval-resolved' }
   | { type: 'done'; output: string }
   | { type: 'error'; message: string };
 
@@ -48,12 +50,16 @@ export interface StreamRunOptions {
 /** Hermes 가 보내는 원본 SSE 이벤트 (필드는 이벤트 종류마다 다름) */
 interface RawRunEvent {
   event?: string;
+  run_id?: string;
   delta?: string;
   tool?: string;
   preview?: string;
   duration?: number;
   error?: boolean | string;
   output?: string;
+  command?: string;
+  description?: string;
+  choices?: string[];
 }
 
 function mapEvent(ev: RawRunEvent): RunEvent | null {
@@ -70,6 +76,16 @@ function mapEvent(ev: RawRunEvent): RunEvent | null {
     case 'message.delta':
     case 'text.delta':
       return ev.delta ? { type: 'text', delta: ev.delta } : null;
+    case 'approval.request':
+      return {
+        type: 'approval',
+        runId: ev.run_id ?? '',
+        command: ev.command ?? '',
+        description: ev.description ?? '',
+        choices: ev.choices ?? ['once', 'session', 'always', 'deny'],
+      };
+    case 'approval.responded':
+      return { type: 'approval-resolved' };
     case 'run.completed':
     case 'run.cancelled':
       return { type: 'done', output: ev.output ?? '' };
@@ -158,5 +174,27 @@ export async function* streamRun(opts: StreamRunOptions): AsyncGenerator<RunEven
     }
   } finally {
     opts.signal?.removeEventListener('abort', onAbort);
+  }
+}
+
+/** 대기 중인 승인 요청을 해소한다 (choice: once|session|always|deny) */
+export async function approveRun(
+  runId: string,
+  choice: string,
+  opts?: { baseUrl?: string; apiKey?: string },
+): Promise<void> {
+  const base = opts?.baseUrl ?? DEFAULT_BASE;
+  const key = opts?.apiKey ?? DEFAULT_KEY;
+  const res = await fetch(`${base}/runs/${runId}/approval`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(key ? { Authorization: `Bearer ${key}` } : {}),
+    },
+    body: JSON.stringify({ choice }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new HermesApiError(res.status, detail.slice(0, 300));
   }
 }

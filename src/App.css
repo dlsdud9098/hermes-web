@@ -241,6 +241,33 @@
 }
 .tool-dur { flex-shrink: 0; color: var(--text-dim); }
 
+/* ── 승인 카드 ─────────────────────────────── */
+.approval-card {
+  margin: 6px 0;
+  padding: 10px;
+  border: 1px solid #e0af68;
+  border-radius: 6px;
+  background: rgba(224, 175, 104, 0.12);
+}
+.approval-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: #b07d28;
+  margin-bottom: 6px;
+}
+.approval-desc { font-size: 12px; margin-bottom: 6px; }
+.approval-cmd {
+  display: block;
+  background: var(--bg-bar);
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin-bottom: 8px;
+}
+.approval-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
 .chat-error {
   color: #f7768e;
   font-size: 12px;
