@@ -7,7 +7,11 @@
   --text: #1a1b26;
   --text-dim: #8a8a93;
   --accent: #3b6fe0;
-  font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace;
+  /* 외형 설정 — settings.ts applySettings() 가 덮어씀 */
+  --ui-font: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace;
+  --ui-size: 13px;
+  --ui-weight: 400;
+  --mono: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace;
   color-scheme: light;
 }
 
@@ -21,11 +25,19 @@ html, body, #root {
 body {
   background: var(--bg);
   color: var(--text);
-  font-size: 13px;
+  font-family: var(--ui-font);
+  font-size: var(--ui-size);
+  font-weight: var(--ui-weight);
   -webkit-font-smoothing: antialiased;
 }
 
 button {
   font-family: inherit;
   cursor: pointer;
+}
+
+/* 코드·에디터는 외형 설정과 무관하게 항상 모노스페이스 */
+code, pre, .hljs, .inline-code, .code-block,
+.tool-preview, .approval-cmd, .cm-editor {
+  font-family: var(--mono);
 }

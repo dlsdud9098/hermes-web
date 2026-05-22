@@ -1,22 +1,29 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { DockviewApi } from 'dockview';
 import { ProjectsProvider, useProjects, uid } from './store/projects';
 import { ProjectRail } from './components/ProjectRail';
 import { Workspace } from './components/Workspace';
 import { FolderPicker } from './components/FolderPicker';
+import { SettingsModal } from './components/SettingsModal';
+import { applySettings, loadSettings } from './settings';
 import './App.css';
 
 function Shell() {
   const { projects, activeId, openProject } = useProjects();
   const active = projects.find((p) => p.id === activeId) ?? projects[0];
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   // 활성 Workspace 의 dockview api — 레일 파일 트리에서 뷰어 패널을 열 때 쓴다
   const dockApiRef = useRef<DockviewApi | null>(null);
+
+  // 저장된 외형 설정을 시작 시 적용
+  useEffect(() => { applySettings(loadSettings()); }, []);
 
   return (
     <div className="app">
       <ProjectRail
         onOpenFolder={() => setPickerOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
         onOpenFile={(file) => {
           dockApiRef.current?.addPanel({
             id: uid('panel'),
@@ -46,6 +53,7 @@ function Shell() {
           onPick={(path) => { openProject(path); setPickerOpen(false); }}
         />
       )}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
