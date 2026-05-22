@@ -81,6 +81,37 @@
 .workspace-actions { display: flex; gap: 6px; }
 .workspace-dock { flex: 1; }
 
+/* ── 커스텀 패널 탭 (더블클릭 이름 수정) ───────── */
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 8px;
+  font-size: 12px;
+}
+.tab-label { white-space: nowrap; }
+.tab-input {
+  width: 110px;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 1px 4px;
+}
+.tab-close {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px;
+  border-radius: 3px;
+}
+.tab-close:hover { color: var(--text); background: var(--border); }
+
 /* ── 버튼 ───────────────────────────────────── */
 .btn {
   padding: 4px 12px;

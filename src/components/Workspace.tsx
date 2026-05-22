@@ -10,6 +10,7 @@ import {
 } from 'dockview';
 import 'dockview/dist/styles/dockview.css';
 import { ChatPanel } from './ChatPanel';
+import { PanelTab } from './PanelTab';
 import { useProjects, uid } from '../store/projects';
 import type { Project } from '../types';
 
@@ -49,7 +50,12 @@ export function Workspace({ project }: { project: Project }) {
       seed(event.api);
     }
     counterRef.current = event.api.panels.length + 1;
-    event.api.onDidLayoutChange(() => saveLayout(project.id, event.api.toJSON()));
+
+    // 레이아웃·제목 변경 모두 영속화 (제목 변경은 onDidLayoutChange 로 안 잡힘)
+    const persist = () => saveLayout(project.id, event.api.toJSON());
+    event.api.onDidLayoutChange(persist);
+    for (const panel of event.api.panels) panel.api.onDidTitleChange(persist);
+    event.api.onDidAddPanel((panel) => panel.api.onDidTitleChange(persist));
   }, [project.id, project.layout, saveLayout, seed]);
 
   // mode 'tab' → 활성 그룹에 탭으로 추가 / 'split' → 오른쪽으로 세로 분할
@@ -85,6 +91,7 @@ export function Workspace({ project }: { project: Project }) {
       <DockviewReact
         className="dockview-theme-light workspace-dock"
         components={components}
+        defaultTabComponent={PanelTab}
         onReady={onReady}
       />
     </div>
