@@ -15,6 +15,10 @@ export interface ChatMessage {
   content: string;
   /** assistant 턴에서 실행된 툴들 (있을 때만) */
   tools?: ToolCall[];
+  /** assistant 턴 토큰 사용량 */
+  usage?: { input: number; output: number };
+  /** assistant 턴 소요 시간 (ms) */
+  durationMs?: number;
 }
 
 export interface Project {

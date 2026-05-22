@@ -180,6 +180,14 @@
 .msg-user .msg-body { color: var(--accent); }
 .msg-assistant .msg-body { color: var(--text); }
 
+.msg-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
 .msg-action {
   align-self: flex-start;
   margin-top: 2px;
@@ -342,7 +350,37 @@
 }
 .fileviewer-body { flex: 1; min-height: 0; overflow: hidden; }
 .fileviewer-body .cm-editor { height: 100%; }
-.fileviewer-body .cm-scroller { font-size: 12px; }
+
+/* ── 마크다운 라이브 프리뷰 (codemirror-live-markdown) ── */
+/* 패키지의 editorTheme 가 @uiw/react-codemirror 경유 시 적용 안 돼 직접 보강 */
+.cm-content .cm-formatting-block:not(.cm-formatting-block-visible) {
+  font-size: 0.01em;
+  opacity: 0;
+  overflow: hidden;
+}
+.cm-content .cm-formatting-block-visible { opacity: 0.4; }
+.cm-content .cm-formatting-inline:not(.cm-formatting-inline-visible) {
+  display: inline-flex;
+  max-width: 0;
+  overflow: hidden;
+  opacity: 0;
+}
+.cm-content .cm-header-1 { font-size: 1.9em; font-weight: 700; line-height: 1.3; }
+.cm-content .cm-header-2 { font-size: 1.5em; font-weight: 700; line-height: 1.4; }
+.cm-content .cm-header-3 { font-size: 1.25em; font-weight: 600; }
+.cm-content .cm-header-4,
+.cm-content .cm-header-5,
+.cm-content .cm-header-6 { font-weight: 600; }
+.cm-content .cm-strong { font-weight: 700; }
+.cm-content .cm-emphasis { font-style: italic; }
+.cm-content .cm-strikethrough { text-decoration: line-through; opacity: 0.7; }
+.cm-content .cm-code {
+  background: var(--bg-bar);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.cm-content .cm-highlight { background: rgba(255, 220, 0, 0.35); border-radius: 2px; }
+.cm-content .cm-link { color: var(--accent); text-decoration: underline; }
 
 .chat-error {
   color: #f7768e;

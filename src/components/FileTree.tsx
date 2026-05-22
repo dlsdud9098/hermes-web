@@ -1,7 +1,20 @@
-// 프로젝트 폴더를 트리로 보여주는 dockview 패널. 폴더는 클릭 시 지연 로드.
+// 프로젝트 폴더를 트리로 보여준다. 폴더는 클릭 시 지연 로드.
+// 숨김 파일 표시·정렬 순서는 설정(useSettings)을 따른다.
 
 import { useEffect, useState } from 'react';
 import { listDir, type DirEntry, type DirListing } from '../api/fs';
+import { useSettings } from '../store/settings';
+import type { Settings } from '../settings';
+
+/** 설정에 따라 숨김 필터 + 정렬 */
+function arrange(entries: DirEntry[], settings: Settings): DirEntry[] {
+  let out = settings.showHiddenFiles
+    ? entries
+    : entries.filter((e) => !e.name.startsWith('.'));
+  out = [...out].sort((a, b) => a.name.localeCompare(b.name));
+  if (settings.fileSortOrder === 'name-desc') out.reverse();
+  return out;
+}
 
 interface DirNodeProps {
   entry: DirEntry;
@@ -10,6 +23,7 @@ interface DirNodeProps {
 }
 
 function DirNode({ entry, depth, onOpenFile }: DirNodeProps) {
+  const { settings } = useSettings();
   const [open, setOpen] = useState(false);
   const [listing, setListing] = useState<DirListing | null>(null);
   const [error, setError] = useState(false);
@@ -36,10 +50,10 @@ function DirNode({ entry, depth, onOpenFile }: DirNodeProps) {
       </button>
       {open && listing && (
         <>
-          {listing.dirs.map((d) => (
+          {arrange(listing.dirs, settings).map((d) => (
             <DirNode key={d.path} entry={d} depth={depth + 1} onOpenFile={onOpenFile} />
           ))}
-          {listing.files.map((f) => (
+          {arrange(listing.files, settings).map((f) => (
             <button
               key={f.path}
               className="tree-row tree-file"
@@ -62,6 +76,7 @@ interface FileTreePanelProps {
 }
 
 export function FileTreePanel({ rootPath, onOpenFile }: FileTreePanelProps) {
+  const { settings } = useSettings();
   const [listing, setListing] = useState<DirListing | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,10 +96,10 @@ export function FileTreePanel({ rootPath, onOpenFile }: FileTreePanelProps) {
       {error && <div className="chat-error">⚠ {error}</div>}
       {listing && (
         <>
-          {listing.dirs.map((d) => (
+          {arrange(listing.dirs, settings).map((d) => (
             <DirNode key={d.path} entry={d} depth={0} onOpenFile={onOpenFile} />
           ))}
-          {listing.files.map((f) => (
+          {arrange(listing.files, settings).map((f) => (
             <button
               key={f.path}
               className="tree-row tree-file"

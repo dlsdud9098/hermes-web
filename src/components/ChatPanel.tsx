@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { streamRun, approveRun, HermesApiError } from '../api/hermes';
 import { listSkills, type Skill } from '../api/skills';
 import { useProjects } from '../store/projects';
+import { useSettings } from '../store/settings';
 import { SkillMenu } from './SkillMenu';
 import { Markdown } from './Markdown';
 import { ToolCard } from './ToolCard';
@@ -39,6 +40,7 @@ const MAX_SKILL_RESULTS = 60;
 
 export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
   const { messages: store, setMessages, projects } = useProjects();
+  const { settings } = useSettings();
   const projectPath = projects.find((p) => p.id === projectId)?.path ?? '';
   const [messages, setLocal] = useState<ChatMessage[]>(() => store[panelId] ?? []);
   const [draft, setDraft] = useState('');
@@ -56,8 +58,10 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
   useEffect(() => { setMessages(panelId, messages); }, [messages, panelId, setMessages]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages]);
+    if (settings.autoScroll) {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    }
+  }, [messages, settings.autoScroll]);
 
   // 스킬 목록 1회 로드 (실패해도 채팅은 정상 동작)
   useEffect(() => {
@@ -93,6 +97,7 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
     setLocal([...baseHistory, assistant]);
     setStreaming(true);
 
+    const t0 = Date.now();
     const ac = new AbortController();
     abortRef.current = ac;
     try {
@@ -127,7 +132,12 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
         } else if (ev.type === 'approval-resolved') {
           setPendingApproval(null);
         } else if (ev.type === 'done') {
-          if (!assistant.content && ev.output) assistant = { ...assistant, content: ev.output };
+          assistant = {
+            ...assistant,
+            content: assistant.content || ev.output,
+            usage: ev.usage,
+            durationMs: Date.now() - t0,
+          };
         } else if (ev.type === 'error') {
           throw new Error(ev.message);
         }
@@ -205,9 +215,13 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
         return;
       }
     }
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      send();
+    if (e.key === 'Enter') {
+      // enterToSend: Enter 전송·Shift+Enter 줄바꿈 / false: 반대
+      const shouldSend = settings.enterToSend ? !e.shiftKey : e.shiftKey;
+      if (shouldSend) {
+        e.preventDefault();
+        send();
+      }
     }
   }
 
@@ -230,6 +244,18 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
                 </>
               ) : m.content}
             </div>
+            {m.role === 'assistant'
+              && ((settings.showTiming && m.durationMs != null)
+                || (settings.showTokenUsage && m.usage)) && (
+              <div className="msg-meta">
+                {settings.showTiming && m.durationMs != null && (
+                  <span>{(m.durationMs / 1000).toFixed(1)}초</span>
+                )}
+                {settings.showTokenUsage && m.usage && (
+                  <span>↑{m.usage.input} ↓{m.usage.output}</span>
+                )}
+              </div>
+            )}
             {m.role === 'assistant' && i === messages.length - 1
               && !streaming && m.content && (
               <button className="msg-action" onClick={regenerate}>↻ 재생성</button>

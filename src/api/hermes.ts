@@ -33,7 +33,7 @@ export type RunEvent =
   | { type: 'text'; delta: string }
   | { type: 'approval'; runId: string; command: string; description: string; choices: string[] }
   | { type: 'approval-resolved' }
-  | { type: 'done'; output: string }
+  | { type: 'done'; output: string; usage?: { input: number; output: number } }
   | { type: 'error'; message: string };
 
 export interface StreamRunOptions {
@@ -61,6 +61,7 @@ interface RawRunEvent {
   command?: string;
   description?: string;
   choices?: string[];
+  usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
 }
 
 function mapEvent(ev: RawRunEvent): RunEvent | null {
@@ -89,7 +90,13 @@ function mapEvent(ev: RawRunEvent): RunEvent | null {
       return { type: 'approval-resolved' };
     case 'run.completed':
     case 'run.cancelled':
-      return { type: 'done', output: ev.output ?? '' };
+      return {
+        type: 'done',
+        output: ev.output ?? '',
+        usage: ev.usage
+          ? { input: ev.usage.input_tokens ?? 0, output: ev.usage.output_tokens ?? 0 }
+          : undefined,
+      };
     case 'run.failed':
       return { type: 'error', message: typeof ev.error === 'string' ? ev.error : '런 실패' };
     default:

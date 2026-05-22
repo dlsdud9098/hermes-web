@@ -1,16 +1,21 @@
 // 파일 뷰어/편집 패널 — CodeMirror 기반. 편집 버튼 없이 항상 편집 가능.
-//  - .md → 옵시디언식 라이브 프리뷰 (커서 없는 구간은 렌더, 커서 가면 raw)
+//  - .md → codemirror-live-markdown 으로 옵시디언식 라이브 프리뷰(헤더·볼드 등 렌더)
 //  - 코드 → 확장자별 신택스 하이라이트
-//  - Ctrl+S 또는 저장 버튼으로 저장 (/fs/write)
+//  - 줄번호·줄바꿈·탭크기·자동저장·테마·코드글씨 설정(useSettings) 반영
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { EditorView } from '@codemirror/view';
+import { EditorState, type Extension } from '@codemirror/state';
+import { indentUnit } from '@codemirror/language';
 import { markdown } from '@codemirror/lang-markdown';
-import { livePreview, livePreviewBaseTheme } from '@yuya296/cm6-live-preview-core';
+import {
+  livePreviewPlugin, markdownStylePlugin, editorTheme,
+  mouseSelectingField, collapseOnSelectionFacet,
+} from 'codemirror-live-markdown';
 import { loadLanguage } from '@uiw/codemirror-extensions-langs';
-import type { Extension } from '@codemirror/state';
 import { readFile, writeFile, type FileContent } from '../api/fs';
+import { useSettings } from '../store/settings';
 
 /** 확장자 → @uiw/codemirror-extensions-langs 언어 키 */
 const EXT_LANG: Record<string, string> = {
@@ -32,10 +37,12 @@ function extOf(filePath: string): string {
 }
 
 export function FileViewerPanel({ filePath }: { filePath: string }) {
+  const { settings } = useSettings();
   const [data, setData] = useState<FileContent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
+  const saveTimer = useRef<number | null>(null);
 
   useEffect(() => {
     setError(null);
@@ -50,16 +57,34 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
   const dirty = data != null && draft !== data.content;
 
   const extensions = useMemo<Extension[]>(() => {
+    const list: Extension[] = [
+      EditorState.tabSize.of(settings.tabSize),
+      indentUnit.of(' '.repeat(settings.tabSize)),
+      EditorView.theme({ '&': { fontSize: `${settings.codeFontSize}px` } }),
+    ];
+    if (settings.wordWrap || isMarkdown) list.push(EditorView.lineWrapping);
     if (isMarkdown) {
-      return [markdown(), livePreviewBaseTheme(), livePreview(), EditorView.lineWrapping];
+      list.push(markdown());
+      if (settings.mdLivePreview) {
+        list.push(
+          collapseOnSelectionFacet.of(true),
+          mouseSelectingField,
+          livePreviewPlugin,
+          markdownStylePlugin,
+          editorTheme,
+        );
+      }
+    } else {
+      const key = EXT_LANG[ext];
+      const lang = key ? loadLanguage(key as Parameters<typeof loadLanguage>[0]) : null;
+      if (lang) list.push(lang);
     }
-    const key = EXT_LANG[ext];
-    const lang = key ? loadLanguage(key as Parameters<typeof loadLanguage>[0]) : null;
-    return lang ? [lang] : [];
-  }, [isMarkdown, ext]);
+    return list;
+  }, [isMarkdown, ext, settings.mdLivePreview, settings.wordWrap,
+      settings.tabSize, settings.codeFontSize]);
 
-  async function save() {
-    if (!data || data.truncated || !dirty || saving) return;
+  const save = useCallback(async () => {
+    if (!data || data.truncated || draft === data.content || saving) return;
     setSaving(true);
     setError(null);
     try {
@@ -70,7 +95,16 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
     } finally {
       setSaving(false);
     }
-  }
+  }, [data, draft, saving, filePath]);
+
+  // 자동 저장 — 편집 후 1초 디바운스
+  useEffect(() => {
+    if (!settings.autoSave || !dirty) return;
+    saveTimer.current = window.setTimeout(() => { void save(); }, 1000);
+    return () => {
+      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    };
+  }, [draft, settings.autoSave, dirty, save]);
 
   return (
     <div
@@ -78,14 +112,14 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
       onKeyDown={(e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
           e.preventDefault();
-          save();
+          void save();
         }
       }}
     >
       {dirty && (
         <div className="fileviewer-bar">
           <span className="fileviewer-dirty">● 저장 안 됨</span>
-          <button className="btn" disabled={saving} onClick={save}>
+          <button className="btn" disabled={saving} onClick={() => void save()}>
             {saving ? '저장 중…' : '저장 (Ctrl+S)'}
           </button>
         </div>
@@ -101,10 +135,14 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
           <CodeMirror
             value={draft}
             height="100%"
+            theme={settings.theme === 'dark' ? 'dark' : 'light'}
             extensions={extensions}
             editable={!data.truncated}
             onChange={setDraft}
-            basicSetup={{ lineNumbers: !isMarkdown, foldGutter: !isMarkdown }}
+            basicSetup={{
+              lineNumbers: settings.lineNumbers,
+              foldGutter: settings.lineNumbers,
+            }}
           />
         </div>
       )}
