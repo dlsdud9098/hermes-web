@@ -109,21 +109,37 @@ export function Workspace({ project }: { project: Project }) {
     });
   }, [project.id]);
 
-  // 프로젝트 폴더 파일 트리를 왼쪽 패널로 연다
-  const addFileTree = useCallback(() => {
-    apiRef.current?.addPanel({
-      id: uid('panel'),
+  // 파일 트리 패널 토글 (싱글톤 — 고정 id, 있으면 닫음)
+  const toggleFileTree = useCallback(() => {
+    const api = apiRef.current;
+    if (!api) return;
+    const id = `filetree-${project.id}`;
+    const existing = api.getPanel(id);
+    if (existing) {
+      existing.api.close();
+      return;
+    }
+    api.addPanel({
+      id,
       component: 'filetree',
       title: '파일',
       params: { rootPath: project.path },
       position: { direction: 'left' as const },
     });
-  }, [project.path]);
+  }, [project.id, project.path]);
 
-  // 세션 히스토리 패널을 왼쪽에 연다
-  const addSessionHistory = useCallback(() => {
-    apiRef.current?.addPanel({
-      id: uid('panel'),
+  // 세션 히스토리 패널 토글 (싱글톤)
+  const toggleSessionHistory = useCallback(() => {
+    const api = apiRef.current;
+    if (!api) return;
+    const id = `sessionhistory-${project.id}`;
+    const existing = api.getPanel(id);
+    if (existing) {
+      existing.api.close();
+      return;
+    }
+    api.addPanel({
+      id,
       component: 'sessionhistory',
       title: '세션',
       params: { projectId: project.id },
@@ -138,10 +154,10 @@ export function Workspace({ project }: { project: Project }) {
           {project.name}
         </span>
         <div className="workspace-actions">
-          <button className="btn btn-ghost" onClick={addSessionHistory}>
-            세션
+          <button className="btn btn-ghost" onClick={toggleSessionHistory}>
+            세션 기록
           </button>
-          <button className="btn btn-ghost" onClick={addFileTree}>
+          <button className="btn btn-ghost" onClick={toggleFileTree}>
             파일트리
           </button>
           <button className="btn btn-ghost" onClick={() => addSession('tab')}>
