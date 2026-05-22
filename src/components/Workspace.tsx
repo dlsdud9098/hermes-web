@@ -72,7 +72,7 @@ export function Workspace({ project }: { project: Project }) {
         <button className="btn btn-ghost" onClick={addPanel}>+ 패널</button>
       </div>
       <DockviewReact
-        className="dockview-theme-abyss workspace-dock"
+        className="dockview-theme-light workspace-dock"
         components={components}
         onReady={onReady}
       />

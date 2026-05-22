@@ -17,12 +17,22 @@
 
 ## 2단 메모리 (전역 / 프로젝트)
 
-프론트는 모든 채팅 요청에 `X-Hermes-Project: <projectId>` 헤더를 실어 보낸다.
-실제 메모리 분리는 **Hermes 쪽 훅 플러그인**이 담당해야 한다 (이 레포 범위 밖, 별도 구현):
+프론트는 채팅 요청의 마지막 user 메시지 끝에 `hermes-web:project=<id>` 마커를 붙인다.
+함께 제공하는 `hermes-plugin/hermes-web-memory/` 플러그인을 Hermes 에 설치하면:
 
-- session-start 훅이 헤더의 projectId 를 읽어 `projects/<id>/MEMORY.md` 주입
-- 전역 `USER.md` + `global/MEMORY.md` 는 훅이 항상 주입
-- 저장 라우팅: 사용자가 "전역" 명시 → global, 기본 → 프로젝트
+- `pre_llm_call` 훅이 마커를 읽어 `~/.hermes/projects/<id>/MEMORY.md` 를 현재 턴에 주입
+- 전역 메모리(`MEMORY.md` / `USER.md`)는 Hermes 가 system prompt 에 자동 주입
+- 저장 라우팅: 사용자가 "전역" 명시 → 전역 메모리, 기본 → 프로젝트 파일
+
+마커를 user 메시지에 싣는 이유 — Hermes 는 system 메시지를 자체 system prompt 로 흡수하고
+model 필드도 내부 모델명으로 정규화해, 훅까지 원형이 닿는 프론트 통제 채널이 user 메시지뿐이다.
+
+플러그인 설치:
+
+```bash
+ln -s "$(pwd)/hermes-plugin/hermes-web-memory" ~/.hermes/plugins/hermes-web-memory
+hermes plugins enable hermes-web-memory
+```
 
 ## 개발
 
@@ -36,7 +46,7 @@ npm run dev
 
 ## 상태 / 한계 (v0)
 
-- 세션 메시지는 메모리에만 보관 → 새로고침 시 초기화 (추후 localStorage / Hermes 세션 영속화)
+- 프로젝트·패널 레이아웃·메시지는 localStorage 에 영속화 (새로고침 유지)
 - 채팅은 클라이언트가 메시지 배열 전체를 매 요청 전송 (Hermes 네이티브 세션 연동 미구현)
 - 패널 쓰기 경쟁(같은 프로젝트 동시 수정) 방어는 훅 플러그인 쪽 과제
 

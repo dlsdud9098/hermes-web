@@ -1,7 +1,9 @@
 // Hermes Agent API 클라이언트 — OpenAI 호환 /chat/completions SSE 스트리밍.
 //
-// 2단 메모리: 프로젝트 ID 를 system 메시지 마커로 대화에 심는다.
-// Hermes 훅은 HTTP 헤더를 못 읽으므로(pre_llm_call 은 conversation_history 만 봄)
+// 2단 메모리: 프로젝트 ID 를 마지막 user 메시지 끝에 마커로 부착한다.
+// Hermes 훅(pre_llm_call)이 받는 채널 중 프론트가 통제 가능한 것은 user 메시지 본문뿐 —
+// system 메시지는 Hermes 가 자체 system prompt 로 흡수해 conversation_history 에서 사라지고,
+// model 필드도 내부 모델명으로 정규화된다. 그래서 user 메시지에 마커를 싣는다.
 // hermes-web-memory 플러그인이 이 마커를 읽어 프로젝트별 MEMORY.md 를 주입한다.
 // 전역 메모리(MEMORY.md / USER.md)는 Hermes 가 system prompt 에 자동 주입.
 
@@ -41,11 +43,13 @@ export async function* streamChat(opts: StreamChatOptions): AsyncGenerator<strin
   const base = opts.baseUrl ?? DEFAULT_BASE;
   const key = opts.apiKey ?? DEFAULT_KEY;
 
-  // 프로젝트 마커를 맨 앞 system 메시지로 삽입 → 플러그인이 conversation_history 에서 읽음
-  const messages: ChatMessage[] = [
-    { role: 'system', content: `${PROJECT_MARKER}${opts.projectId}` },
-    ...opts.messages,
-  ];
+  // 프로젝트 마커를 마지막 user 메시지 끝에 부착 → 플러그인이 user_message 에서 읽음
+  const lastUserIdx = opts.messages.map((m) => m.role).lastIndexOf('user');
+  const messages: ChatMessage[] = opts.messages.map((m, i) =>
+    i === lastUserIdx
+      ? { ...m, content: `${m.content}\n\n${PROJECT_MARKER}${opts.projectId}` }
+      : m,
+  );
 
   const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',

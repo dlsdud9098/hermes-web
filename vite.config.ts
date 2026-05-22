@@ -14,6 +14,13 @@ export default defineConfig(({ mode }) => {
           target,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, ''),
+          // Hermes API 서버는 미등록 Origin 요청을 403 으로 거부한다.
+          // 프록시→게이트웨이는 서버↔서버 호출이므로 Origin 을 제거해 통과시킨다.
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.removeHeader('origin');
+            });
+          },
         },
       },
     },

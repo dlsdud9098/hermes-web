@@ -1,14 +1,14 @@
 :root {
-  --bg: #16161e;
-  --bg-rail: #101014;
-  --bg-bar: #1a1b26;
-  --bg-panel: #1e2030;
-  --border: #2a2c3d;
-  --text: #c0caf5;
-  --text-dim: #565f89;
-  --accent: #7aa2f7;
+  --bg: #f6f6f7;
+  --bg-rail: #ececed;
+  --bg-bar: #f0f0f1;
+  --bg-panel: #ffffff;
+  --border: #d9d9de;
+  --text: #1a1b26;
+  --text-dim: #8a8a93;
+  --accent: #3b6fe0;
   font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }

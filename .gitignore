@@ -17,6 +17,10 @@ dist-ssr
 .env.*
 !.env.example
 
+# Python 아티팩트 (hermes-plugin/)
+__pycache__/
+*.pyc
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
