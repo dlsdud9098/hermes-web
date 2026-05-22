@@ -11,7 +11,8 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
-  const { messages: store, setMessages } = useProjects();
+  const { messages: store, setMessages, projects } = useProjects();
+  const projectPath = projects.find((p) => p.id === projectId)?.path ?? '';
   const [messages, setLocal] = useState<ChatMessage[]>(() => store[panelId] ?? []);
   const [draft, setDraft] = useState('');
   const [streaming, setStreaming] = useState(false);
@@ -45,6 +46,7 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
       for await (const delta of streamChat({
         sessionId: panelId,
         projectId,
+        projectPath,
         message: text,
         signal: ac.signal,
       })) {

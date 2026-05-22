@@ -13,6 +13,8 @@
 
 /** 플러그인(hermes-plugin/hermes-web-memory)과 반드시 동일해야 하는 마커 */
 export const PROJECT_MARKER = 'hermes-web:project=';
+/** 프로젝트 작업 폴더 마커 — 플러그인이 읽어 "이 폴더에서 작업하라"고 주입 */
+export const CWD_MARKER = 'hermes-web:cwd=';
 
 // 기본값은 vite dev 프록시 경로(/api → Hermes). CORS 없이 동작.
 // 프록시 없이 직접 붙으려면 VITE_HERMES_BASE 로 절대 URL 지정.
@@ -36,6 +38,8 @@ export interface StreamChatOptions {
   sessionId: string;
   /** 2단 메모리용 프로젝트 id */
   projectId: string;
+  /** 프로젝트 작업 폴더 절대경로. 비어 있으면 cwd 마커 생략 */
+  projectPath?: string;
   /** 이번 턴의 새 user 메시지 (히스토리 제외) */
   message: string;
   model?: string;
@@ -49,8 +53,11 @@ export async function* streamChat(opts: StreamChatOptions): AsyncGenerator<strin
   const base = opts.baseUrl ?? DEFAULT_BASE;
   const key = opts.apiKey ?? DEFAULT_KEY;
 
-  // 새 user 메시지 끝에 프로젝트 마커 부착 → 플러그인이 user_message 에서 읽음
-  const content = `${opts.message}\n\n${PROJECT_MARKER}${opts.projectId}`;
+  // 새 user 메시지 끝에 마커 부착 → 플러그인이 user_message 에서 읽음
+  let content = `${opts.message}\n\n${PROJECT_MARKER}${opts.projectId}`;
+  if (opts.projectPath && opts.projectPath.trim()) {
+    content += `\n${CWD_MARKER}${opts.projectPath.trim()}`;
+  }
 
   const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',

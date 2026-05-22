@@ -52,7 +52,8 @@ export function Workspace({ project }: { project: Project }) {
     event.api.onDidLayoutChange(() => saveLayout(project.id, event.api.toJSON()));
   }, [project.id, project.layout, saveLayout, seed]);
 
-  const addPanel = useCallback(() => {
+  // mode 'tab' → 활성 그룹에 탭으로 추가 / 'split' → 오른쪽으로 세로 분할
+  const addSession = useCallback((mode: 'tab' | 'split') => {
     const api = apiRef.current;
     if (!api) return;
     api.addPanel({
@@ -60,16 +61,26 @@ export function Workspace({ project }: { project: Project }) {
       component: 'chat',
       title: `세션 ${counterRef.current++}`,
       params: { projectId: project.id },
+      ...(mode === 'split'
+        ? { position: { direction: 'right' as const } }
+        : {}),
     });
   }, [project.id]);
 
   return (
     <div className="workspace">
       <div className="workspace-bar">
-        <span className="workspace-title" style={{ color: project.color }}>
+        <span className="workspace-title" style={{ color: project.color }} title={project.path}>
           {project.name}
         </span>
-        <button className="btn btn-ghost" onClick={addPanel}>+ 패널</button>
+        <div className="workspace-actions">
+          <button className="btn btn-ghost" onClick={() => addSession('tab')}>
+            + 탭
+          </button>
+          <button className="btn btn-ghost" onClick={() => addSession('split')}>
+            + 분할
+          </button>
+        </div>
       </div>
       <DockviewReact
         className="dockview-theme-light workspace-dock"

@@ -1,4 +1,5 @@
 // 전역 상태 — 프로젝트 목록 / 활성 프로젝트 / 패널별 메시지.
+// 프로젝트 = 폴더. 폴더를 열면 프로젝트가 생기고 이름은 폴더명에서 자동 도출된다.
 // localStorage 에 영속화 — 새로고침해도 프로젝트·패널 레이아웃·메시지 유지.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
@@ -11,11 +12,18 @@ const STORAGE_KEY = 'hermes-web:state:v1';
 let seq = 0;
 const uid = (prefix: string): string => `${prefix}-${Date.now().toString(36)}-${seq++}`;
 
+/** 절대경로에서 폴더명만 추출 — 프로젝트 표시 이름으로 쓴다 */
+function basename(path: string): string {
+  const parts = path.replace(/[/\\]+$/, '').split(/[/\\]/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : (path || '프로젝트');
+}
+
 interface ProjectsContextValue {
   projects: Project[];
   activeId: string;
   messages: Record<string, ChatMessage[]>;
-  addProject: (name: string) => void;
+  /** 폴더 경로로 프로젝트를 연다. 이름은 폴더명에서 자동 도출 */
+  openProject: (path: string) => void;
   removeProject: (id: string) => void;
   setActive: (id: string) => void;
   saveLayout: (projectId: string, layout: unknown) => void;
@@ -30,26 +38,27 @@ interface PersistedState {
 
 const ProjectsContext = createContext<ProjectsContextValue | null>(null);
 
-function makeProject(name: string): Project {
+function makeProject(path: string): Project {
   return {
     id: uid('proj'),
-    name,
+    name: basename(path),
+    path,
     color: COLORS[seq % COLORS.length],
     layout: null,
   };
 }
 
-/** localStorage 에서 상태 복원. 손상/없음/빈 목록이면 null */
+/** localStorage 에서 상태 복원. 손상/없음이면 null */
 function loadState(): PersistedState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
-    if (!Array.isArray(parsed.projects) || parsed.projects.length === 0) return null;
+    if (!Array.isArray(parsed.projects)) return null;
     const projects = parsed.projects;
     const activeId = projects.some((p) => p.id === parsed.activeId)
       ? (parsed.activeId as string)
-      : projects[0].id;
+      : (projects[0]?.id ?? '');
     return { projects, activeId, messages: parsed.messages ?? {} };
   } catch {
     return null;
@@ -58,12 +67,9 @@ function loadState(): PersistedState | null {
 
 export function ProjectsProvider({ children }: { children: ReactNode }) {
   const [restored] = useState<PersistedState | null>(() => loadState());
-  const [projects, setProjects] = useState<Project[]>(
-    () => restored?.projects ?? [makeProject('첫 프로젝트')],
-  );
-  const [activeId, setActiveId] = useState<string>(
-    () => restored?.activeId ?? projects[0].id,
-  );
+  // 첫 실행(미복원)이면 프로젝트 없음 — 폴더를 열어야 시작
+  const [projects, setProjects] = useState<Project[]>(() => restored?.projects ?? []);
+  const [activeId, setActiveId] = useState<string>(() => restored?.activeId ?? '');
   const [messages, setMessagesState] = useState<Record<string, ChatMessage[]>>(
     () => restored?.messages ?? {},
   );
@@ -78,8 +84,10 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     }
   }, [projects, activeId, messages]);
 
-  const addProject = useCallback((name: string) => {
-    const project = makeProject(name.trim() || '새 프로젝트');
+  const openProject = useCallback((path: string) => {
+    const trimmed = path.trim();
+    if (!trimmed) return;
+    const project = makeProject(trimmed);
     setProjects((prev) => [...prev, project]);
     setActiveId(project.id);
   }, []);
@@ -87,8 +95,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const removeProject = useCallback((id: string) => {
     setProjects((prev) => {
       const next = prev.filter((p) => p.id !== id);
-      if (next.length === 0) return prev; // 최소 1개 유지
-      setActiveId((cur) => (cur === id ? next[0].id : cur));
+      setActiveId((cur) => (cur === id ? (next[0]?.id ?? '') : cur));
       return next;
     });
   }, []);
@@ -108,9 +115,9 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ProjectsContextValue>(
     () => ({
       projects, activeId, messages,
-      addProject, removeProject, setActive, saveLayout, setMessages,
+      openProject, removeProject, setActive, saveLayout, setMessages,
     }),
-    [projects, activeId, messages, addProject, removeProject, setActive, saveLayout, setMessages],
+    [projects, activeId, messages, openProject, removeProject, setActive, saveLayout, setMessages],
   );
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;
