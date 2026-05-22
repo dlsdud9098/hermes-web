@@ -13,6 +13,7 @@ import { ChatPanel } from './ChatPanel';
 import { PanelTab } from './PanelTab';
 import { FileTreePanel } from './FileTree';
 import { FileViewerPanel } from './FileViewer';
+import { SessionHistoryPanel } from './SessionHistory';
 import { useProjects, uid } from '../store/projects';
 import type { Project } from '../types';
 import type { DirEntry } from '../api/fs';
@@ -38,6 +39,24 @@ const components = {
   ),
   fileviewer: (props: IDockviewPanelProps<ViewerParams>) => (
     <FileViewerPanel filePath={props.params.filePath} />
+  ),
+  sessionhistory: (props: IDockviewPanelProps<ChatParams>) => (
+    <SessionHistoryPanel
+      projectId={props.params.projectId}
+      onOpenSession={(panelId, title) => {
+        const existing = props.containerApi.getPanel(panelId);
+        if (existing) {
+          existing.focus();
+          return;
+        }
+        props.containerApi.addPanel({
+          id: panelId,
+          component: 'chat',
+          title: title.slice(0, 24) || '세션',
+          params: { projectId: props.params.projectId },
+        });
+      }}
+    />
   ),
 };
 
@@ -101,6 +120,17 @@ export function Workspace({ project }: { project: Project }) {
     });
   }, [project.path]);
 
+  // 세션 히스토리 패널을 왼쪽에 연다
+  const addSessionHistory = useCallback(() => {
+    apiRef.current?.addPanel({
+      id: uid('panel'),
+      component: 'sessionhistory',
+      title: '세션',
+      params: { projectId: project.id },
+      position: { direction: 'left' as const },
+    });
+  }, [project.id]);
+
   return (
     <div className="workspace">
       <div className="workspace-bar">
@@ -108,6 +138,9 @@ export function Workspace({ project }: { project: Project }) {
           {project.name}
         </span>
         <div className="workspace-actions">
+          <button className="btn btn-ghost" onClick={addSessionHistory}>
+            세션
+          </button>
           <button className="btn btn-ghost" onClick={addFileTree}>
             파일트리
           </button>

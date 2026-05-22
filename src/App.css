@@ -320,6 +320,30 @@
 .fileviewer-pre { margin: 0; padding: 10px; }
 .fileviewer-pre code.hljs { font-size: 12px; background: transparent; padding: 0; }
 
+/* ── 세션 히스토리 패널 ─────────────────────── */
+.sessionhist {
+  height: 100%;
+  overflow: auto;
+  background: var(--bg-panel);
+  padding: 4px;
+}
+.sess-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text);
+  text-align: left;
+  font-size: 12px;
+}
+.sess-row:hover { background: var(--bg-bar); }
+.sess-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sess-count { flex-shrink: 0; color: var(--text-dim); font-size: 11px; }
+
 .chat-error {
   color: #f7768e;
   font-size: 12px;
