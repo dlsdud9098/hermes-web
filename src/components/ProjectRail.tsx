@@ -8,11 +8,10 @@ import type { DirEntry } from '../api/fs';
 
 interface ProjectRailProps {
   onOpenFolder: () => void;
-  onOpenSettings: () => void;
   onOpenFile: (file: DirEntry) => void;
 }
 
-export function ProjectRail({ onOpenFolder, onOpenSettings, onOpenFile }: ProjectRailProps) {
+export function ProjectRail({ onOpenFolder, onOpenFile }: ProjectRailProps) {
   const { projects, activeId, setActive, removeProject } = useProjects();
   // 활성 프로젝트 트리 펼침 여부 — 활성 탭을 다시 누르면 토글
   const [treeOpen, setTreeOpen] = useState(true);
@@ -52,9 +51,6 @@ export function ProjectRail({ onOpenFolder, onOpenSettings, onOpenFile }: Projec
           +
         </button>
       </div>
-      <button className="rail-settings" onClick={onOpenSettings} title="설정">
-        ⚙
-      </button>
     </nav>
   );
 }

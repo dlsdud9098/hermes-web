@@ -13,18 +13,9 @@ export const PROJECT_MARKER = 'hermes-web:project=';
 /** 프로젝트 작업 폴더 마커 */
 export const CWD_MARKER = 'hermes-web:cwd=';
 
-import { loadSettings } from '../settings';
-
-const ENV_BASE = import.meta.env.VITE_HERMES_BASE as string | undefined;
-const ENV_KEY = import.meta.env.VITE_HERMES_KEY as string | undefined;
-
-/** 우선순위: 설정(localStorage) → .env → 프록시 기본값 */
-function resolveBase(): string {
-  return loadSettings().hermesBaseUrl || ENV_BASE || '/api/v1';
-}
-function resolveKey(): string | undefined {
-  return loadSettings().hermesKey || ENV_KEY;
-}
+// 로컬 전용 — 연결 정보는 .env 빌드타임 값으로 고정.
+const DEFAULT_BASE = (import.meta.env.VITE_HERMES_BASE as string | undefined) ?? '/api/v1';
+const DEFAULT_KEY = import.meta.env.VITE_HERMES_KEY as string | undefined;
 
 export class HermesApiError extends Error {
   readonly status: number;
@@ -108,8 +99,8 @@ function mapEvent(ev: RawRunEvent): RunEvent | null {
 
 /** 에이전트 런을 시작하고 정규화된 이벤트를 순차 yield 한다 */
 export async function* streamRun(opts: StreamRunOptions): AsyncGenerator<RunEvent> {
-  const base = opts.baseUrl ?? resolveBase();
-  const key = opts.apiKey ?? resolveKey();
+  const base = opts.baseUrl ?? DEFAULT_BASE;
+  const key = opts.apiKey ?? DEFAULT_KEY;
 
   let content = `${opts.message}\n\n${PROJECT_MARKER}${opts.projectId}`;
   if (opts.projectPath && opts.projectPath.trim()) {
@@ -193,8 +184,8 @@ export async function approveRun(
   choice: string,
   opts?: { baseUrl?: string; apiKey?: string },
 ): Promise<void> {
-  const base = opts?.baseUrl ?? resolveBase();
-  const key = opts?.apiKey ?? resolveKey();
+  const base = opts?.baseUrl ?? DEFAULT_BASE;
+  const key = opts?.apiKey ?? DEFAULT_KEY;
   const res = await fetch(`${base}/runs/${runId}/approval`, {
     method: 'POST',
     headers: {
