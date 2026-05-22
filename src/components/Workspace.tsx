@@ -1,4 +1,4 @@
-// 한 프로젝트의 작업 공간 — dockview 도킹 레이아웃. 패널 = Hermes 세션.
+// 한 프로젝트의 작업 공간 — dockview 도킹 레이아웃. 패널 = Hermes 세션 / 파일 뷰어.
 // App 에서 project.id 를 key 로 주므로 프로젝트 전환 시 remount → 레이아웃 복원.
 
 import { useCallback, useRef } from 'react';
@@ -11,37 +11,29 @@ import {
 import 'dockview/dist/styles/dockview.css';
 import { ChatPanel } from './ChatPanel';
 import { PanelTab } from './PanelTab';
-import { FileTreePanel } from './FileTree';
 import { FileViewerPanel } from './FileViewer';
 import { useProjects, uid } from '../store/projects';
 import type { Project } from '../types';
-import type { DirEntry } from '../api/fs';
 
 interface ChatParams { projectId: string }
-interface TreeParams { rootPath: string }
 interface ViewerParams { filePath: string }
 
 const components = {
   chat: (props: IDockviewPanelProps<ChatParams>) => (
     <ChatPanel panelId={props.api.id} projectId={props.params.projectId} />
   ),
-  filetree: (props: IDockviewPanelProps<TreeParams>) => (
-    <FileTreePanel
-      rootPath={props.params.rootPath}
-      onOpenFile={(file: DirEntry) => props.containerApi.addPanel({
-        id: uid('panel'),
-        component: 'fileviewer',
-        title: file.name,
-        params: { filePath: file.path },
-      })}
-    />
-  ),
   fileviewer: (props: IDockviewPanelProps<ViewerParams>) => (
     <FileViewerPanel filePath={props.params.filePath} />
   ),
 };
 
-export function Workspace({ project }: { project: Project }) {
+interface WorkspaceProps {
+  project: Project;
+  /** dockview api 가 준비되면 App 에 넘긴다 (레일에서 파일 뷰어를 열기 위함) */
+  onApiReady: (api: DockviewApi) => void;
+}
+
+export function Workspace({ project, onApiReady }: WorkspaceProps) {
   const { saveLayout } = useProjects();
   const apiRef = useRef<DockviewApi | null>(null);
   const counterRef = useRef(1);
@@ -57,6 +49,7 @@ export function Workspace({ project }: { project: Project }) {
 
   const onReady = useCallback((event: DockviewReadyEvent) => {
     apiRef.current = event.api;
+    onApiReady(event.api);
     if (project.layout) {
       try {
         event.api.fromJSON(project.layout as Parameters<DockviewApi['fromJSON']>[0]);
@@ -73,7 +66,7 @@ export function Workspace({ project }: { project: Project }) {
     event.api.onDidLayoutChange(persist);
     for (const panel of event.api.panels) panel.api.onDidTitleChange(persist);
     event.api.onDidAddPanel((panel) => panel.api.onDidTitleChange(persist));
-  }, [project.id, project.layout, saveLayout, seed]);
+  }, [project.id, project.layout, saveLayout, seed, onApiReady]);
 
   // mode 'tab' → 활성 그룹에 탭으로 추가 / 'split' → 오른쪽으로 세로 분할
   const addSession = useCallback((mode: 'tab' | 'split') => {
@@ -90,34 +83,6 @@ export function Workspace({ project }: { project: Project }) {
     });
   }, [project.id]);
 
-  // 파일 트리 패널 토글 (VS Code 사이드바식 3-상태):
-  //  - 없음     → 왼쪽에 열고 포커스
-  //  - 활성중   → 닫기
-  //  - 비활성   → 포커스만 (닫지 않음)
-  const toggleFileTree = useCallback(() => {
-    const api = apiRef.current;
-    if (!api) return;
-    const id = `filetree-${project.id}`;
-    const existing = api.getPanel(id);
-    if (!existing) {
-      api.addPanel({
-        id,
-        component: 'filetree',
-        title: '파일트리',
-        params: { rootPath: project.path },
-        position: { direction: 'left' as const },
-      });
-      return;
-    }
-    // isActive 는 '그룹 내 활성 탭' — 단독 패널은 항상 true 라 쓸 수 없다.
-    // isGroupActive 로 '그 패널의 그룹이 포커스됐는지'를 본다.
-    if (existing.api.isGroupActive) {
-      existing.api.close();
-    } else {
-      existing.focus();
-    }
-  }, [project.id, project.path]);
-
   return (
     <div className="workspace">
       <div className="workspace-bar">
@@ -125,9 +90,6 @@ export function Workspace({ project }: { project: Project }) {
           {project.name}
         </span>
         <div className="workspace-actions">
-          <button className="btn btn-ghost" onClick={toggleFileTree}>
-            파일트리
-          </button>
           <button className="btn btn-ghost" onClick={() => addSession('tab')}>
             + 탭
           </button>
