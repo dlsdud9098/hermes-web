@@ -1,0 +1,7 @@
+name: hermes-web-memory
+version: 0.1.0
+description: >-
+  hermes-web 프론트엔드용 프로젝트별 메모리 주입 플러그인.
+  pre_llm_call 훅이 'hermes-web:project=<id>' 마커를 읽어
+  ~/.hermes/projects/<id>/MEMORY.md 를 대화에 주입한다.
+entry: __init__.py

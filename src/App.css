@@ -1,0 +1,163 @@
+/* 레이아웃: [세로 프로젝트 레일] [작업 공간(도킹)] */
+
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── 프로젝트 레일 ───────────────────────────── */
+.rail {
+  width: 168px;
+  flex-shrink: 0;
+  background: var(--bg-rail);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  gap: 2px;
+}
+
+.rail-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  color: var(--text-dim);
+  text-align: left;
+  font-size: 12px;
+}
+
+.rail-tab:hover { background: var(--bg-bar); color: var(--text); }
+.rail-tab-active { background: var(--bg-bar); color: var(--text); }
+
+.rail-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.rail-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-add {
+  margin: 6px 10px 0;
+  padding: 4px;
+  background: transparent;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.rail-add:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── 작업 공간 ──────────────────────────────── */
+.workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.workspace-bar {
+  height: 34px;
+  flex-shrink: 0;
+  background: var(--bg-bar);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+}
+
+.workspace-title { font-size: 12px; font-weight: 600; }
+.workspace-dock { flex: 1; }
+
+/* ── 버튼 ───────────────────────────────────── */
+.btn {
+  padding: 4px 12px;
+  background: var(--accent);
+  border: none;
+  border-radius: 4px;
+  color: #16161e;
+  font-size: 12px;
+  font-weight: 600;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.btn-ghost:hover { color: var(--accent); border-color: var(--accent); }
+.btn-stop { background: #f7768e; }
+
+/* ── 채팅 패널 ──────────────────────────────── */
+.chat {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+}
+
+.chat-log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chat-empty {
+  margin: auto;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.msg { display: flex; flex-direction: column; gap: 3px; }
+.msg-role {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  letter-spacing: 0.05em;
+}
+.msg-body { white-space: pre-wrap; line-height: 1.5; word-break: break-word; }
+.msg-user .msg-body { color: var(--accent); }
+.msg-assistant .msg-body { color: var(--text); }
+
+.chat-error {
+  color: #f7768e;
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid #f7768e44;
+  border-radius: 4px;
+}
+
+.chat-composer {
+  flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.chat-composer textarea {
+  flex: 1;
+  resize: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+}
+.chat-composer textarea:focus { outline: 1px solid var(--accent); }
