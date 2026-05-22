@@ -6,6 +6,7 @@ import { streamChat, HermesApiError } from '../api/hermes';
 import { listSkills, type Skill } from '../api/skills';
 import { useProjects } from '../store/projects';
 import { SkillMenu } from './SkillMenu';
+import { Markdown } from './Markdown';
 import type { ChatMessage } from '../types';
 
 interface ChatPanelProps {
@@ -147,7 +148,11 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
         {messages.map((m, i) => (
           <div key={i} className={`msg msg-${m.role}`}>
             <span className="msg-role">{m.role}</span>
-            <div className="msg-body">{m.content || (streaming ? '…' : '')}</div>
+            <div className="msg-body">
+              {m.role === 'assistant'
+                ? (m.content ? <Markdown content={m.content} /> : (streaming ? '…' : ''))
+                : m.content}
+            </div>
           </div>
         ))}
         {error && <div className="chat-error">⚠ {error}</div>}
