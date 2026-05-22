@@ -58,19 +58,62 @@ function fsBrowserPlugin(): Plugin {
         if (!req.url || !req.url.startsWith('/fs/')) return next()
         res.setHeader('Content-Type', 'application/json')
 
-        // 디렉토리 목록
+        // 디렉토리 목록 (하위 폴더 + 파일)
         if (req.url.startsWith('/fs/list')) {
           const url = new URL(req.url, 'http://localhost')
           const dir = url.searchParams.get('path') || os.homedir()
           try {
             const abs = path.resolve(dir)
-            const dirs = fs
+            const entries = fs
               .readdirSync(abs, { withFileTypes: true })
-              .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+              .filter((e) => !e.name.startsWith('.'))
+            const byName = (a: { name: string }, b: { name: string }) =>
+              a.name.localeCompare(b.name)
+            const dirs = entries
+              .filter((e) => e.isDirectory())
               .map((e) => ({ name: e.name, path: path.join(abs, e.name) }))
-              .sort((a, b) => a.name.localeCompare(b.name))
+              .sort(byName)
+            const files = entries
+              .filter((e) => e.isFile())
+              .map((e) => ({ name: e.name, path: path.join(abs, e.name) }))
+              .sort(byName)
             const parent = path.dirname(abs)
-            res.end(JSON.stringify({ path: abs, parent: parent === abs ? null : parent, dirs }))
+            res.end(JSON.stringify({
+              path: abs,
+              parent: parent === abs ? null : parent,
+              dirs,
+              files,
+            }))
+          } catch (err) {
+            res.statusCode = 400
+            res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
+          }
+          return
+        }
+
+        // 파일 내용 읽기 (최대 256KB)
+        if (req.url.startsWith('/fs/read')) {
+          const url = new URL(req.url, 'http://localhost')
+          const file = url.searchParams.get('path')
+          if (!file) {
+            res.statusCode = 400
+            res.end(JSON.stringify({ error: 'path 누락' }))
+            return
+          }
+          try {
+            const abs = path.resolve(file)
+            const MAX = 256 * 1024
+            const stat = fs.statSync(abs)
+            if (!stat.isFile()) throw new Error('파일이 아님')
+            const fd = fs.openSync(abs, 'r')
+            const buf = Buffer.alloc(Math.min(stat.size, MAX))
+            fs.readSync(fd, buf, 0, buf.length, 0)
+            fs.closeSync(fd)
+            res.end(JSON.stringify({
+              path: abs,
+              content: buf.toString('utf-8'),
+              truncated: stat.size > MAX,
+            }))
           } catch (err) {
             res.statusCode = 400
             res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))

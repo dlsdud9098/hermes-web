@@ -11,16 +11,33 @@ import {
 import 'dockview/dist/styles/dockview.css';
 import { ChatPanel } from './ChatPanel';
 import { PanelTab } from './PanelTab';
+import { FileTreePanel } from './FileTree';
+import { FileViewerPanel } from './FileViewer';
 import { useProjects, uid } from '../store/projects';
 import type { Project } from '../types';
+import type { DirEntry } from '../api/fs';
 
-interface ChatParams {
-  projectId: string;
-}
+interface ChatParams { projectId: string }
+interface TreeParams { rootPath: string }
+interface ViewerParams { filePath: string }
 
 const components = {
   chat: (props: IDockviewPanelProps<ChatParams>) => (
     <ChatPanel panelId={props.api.id} projectId={props.params.projectId} />
+  ),
+  filetree: (props: IDockviewPanelProps<TreeParams>) => (
+    <FileTreePanel
+      rootPath={props.params.rootPath}
+      onOpenFile={(file: DirEntry) => props.containerApi.addPanel({
+        id: uid('panel'),
+        component: 'fileviewer',
+        title: file.name,
+        params: { filePath: file.path },
+      })}
+    />
+  ),
+  fileviewer: (props: IDockviewPanelProps<ViewerParams>) => (
+    <FileViewerPanel filePath={props.params.filePath} />
   ),
 };
 
@@ -73,6 +90,17 @@ export function Workspace({ project }: { project: Project }) {
     });
   }, [project.id]);
 
+  // 프로젝트 폴더 파일 트리를 왼쪽 패널로 연다
+  const addFileTree = useCallback(() => {
+    apiRef.current?.addPanel({
+      id: uid('panel'),
+      component: 'filetree',
+      title: '파일',
+      params: { rootPath: project.path },
+      position: { direction: 'left' as const },
+    });
+  }, [project.path]);
+
   return (
     <div className="workspace">
       <div className="workspace-bar">
@@ -80,6 +108,9 @@ export function Workspace({ project }: { project: Project }) {
           {project.name}
         </span>
         <div className="workspace-actions">
+          <button className="btn btn-ghost" onClick={addFileTree}>
+            파일트리
+          </button>
           <button className="btn btn-ghost" onClick={() => addSession('tab')}>
             + 탭
           </button>

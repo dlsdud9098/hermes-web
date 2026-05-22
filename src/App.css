@@ -268,6 +268,46 @@
 }
 .approval-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
+/* ── 파일 트리 패널 ─────────────────────────── */
+.filetree {
+  height: 100%;
+  overflow: auto;
+  background: var(--bg-panel);
+  padding: 4px 0;
+  font-size: 12px;
+}
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 3px 8px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  white-space: nowrap;
+}
+.tree-row:hover { background: var(--bg-bar); }
+.tree-caret { width: 10px; flex-shrink: 0; color: var(--text-dim); }
+.tree-ic { flex-shrink: 0; }
+.tree-file { color: var(--text-dim); }
+
+/* ── 파일 뷰어 패널 ─────────────────────────── */
+.fileviewer {
+  height: 100%;
+  overflow: auto;
+  background: var(--bg-panel);
+}
+.fileviewer-note {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #b07d28;
+  background: rgba(224, 175, 104, 0.12);
+}
+.fileviewer-pre { margin: 0; padding: 10px; }
+.fileviewer-pre code.hljs { font-size: 12px; background: transparent; padding: 0; }
+
 .chat-error {
   color: #f7768e;
   font-size: 12px;
