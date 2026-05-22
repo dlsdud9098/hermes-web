@@ -11,8 +11,22 @@
   --ui-font: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace;
   --ui-size: 13px;
   --ui-weight: 400;
+  --ui-line: 1.5;
+  --code-size: 12px;
   --mono: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace;
   color-scheme: light;
+}
+
+/* 다크 테마 — accent 는 강조색 설정이 따로 덮어씀 */
+:root[data-theme='dark'] {
+  --bg: #16161e;
+  --bg-rail: #101014;
+  --bg-bar: #1a1b26;
+  --bg-panel: #1e2030;
+  --border: #2a2c3d;
+  --text: #c0caf5;
+  --text-dim: #565f89;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -28,6 +42,7 @@ body {
   font-family: var(--ui-font);
   font-size: var(--ui-size);
   font-weight: var(--ui-weight);
+  line-height: var(--ui-line);
   -webkit-font-smoothing: antialiased;
 }
 

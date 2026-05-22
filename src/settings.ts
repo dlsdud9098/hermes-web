@@ -1,12 +1,29 @@
-// 앱 외형 설정 — 글씨 크기·굵기·폰트. localStorage 영속 + CSS 변수로 적용.
+// 앱 설정 — 외형/채팅/에디터/파일. localStorage 영속 + 일부는 CSS 변수로 적용.
 
 export interface Settings {
-  /** FONT_OPTIONS 의 key */
+  // ── 외형 ──
+  theme: 'light' | 'dark';
   fontFamily: string;
-  /** px */
   fontSize: number;
-  /** CSS font-weight */
   fontWeight: number;
+  lineHeight: number;
+  accentColor: string;
+  codeFontSize: number;
+  // ── 채팅 ──
+  /** true: Enter 전송·Shift+Enter 줄바꿈 / false: 반대 */
+  enterToSend: boolean;
+  showTokenUsage: boolean;
+  showTiming: boolean;
+  autoScroll: boolean;
+  // ── 에디터 ──
+  autoSave: boolean;
+  lineNumbers: boolean;
+  wordWrap: boolean;
+  tabSize: number;
+  mdLivePreview: boolean;
+  // ── 파일 ──
+  showHiddenFiles: boolean;
+  fileSortOrder: 'name-asc' | 'name-desc';
 }
 
 export const FONT_OPTIONS = [
@@ -34,19 +51,36 @@ export const WEIGHT_OPTIONS = [
   { value: 700, label: '굵게' },
 ] as const;
 
+export const DEFAULTS: Settings = {
+  theme: 'light',
+  fontFamily: 'mono',
+  fontSize: 13,
+  fontWeight: 400,
+  lineHeight: 1.5,
+  accentColor: '#3b6fe0',
+  codeFontSize: 12,
+  enterToSend: true,
+  showTokenUsage: false,
+  showTiming: true,
+  autoScroll: true,
+  autoSave: false,
+  lineNumbers: true,
+  wordWrap: false,
+  tabSize: 4,
+  mdLivePreview: true,
+  showHiddenFiles: true,
+  fileSortOrder: 'name-asc',
+};
+
 const STORAGE_KEY = 'hermes-web:settings:v1';
-const DEFAULTS: Settings = { fontFamily: 'mono', fontSize: 13, fontWeight: 400 };
 
 export function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULTS };
-    const p = JSON.parse(raw) as Partial<Settings>;
-    return {
-      fontFamily: typeof p.fontFamily === 'string' ? p.fontFamily : DEFAULTS.fontFamily,
-      fontSize: typeof p.fontSize === 'number' ? p.fontSize : DEFAULTS.fontSize,
-      fontWeight: typeof p.fontWeight === 'number' ? p.fontWeight : DEFAULTS.fontWeight,
-    };
+    const parsed = JSON.parse(raw) as Partial<Settings>;
+    // 누락 필드는 기본값으로 채움 (스키마 확장 대비)
+    return { ...DEFAULTS, ...parsed };
   } catch {
     return { ...DEFAULTS };
   }
@@ -60,11 +94,15 @@ export function saveSettings(settings: Settings): void {
   }
 }
 
-/** 설정을 CSS 변수로 :root 에 적용 */
+/** CSS 변수·data-theme 로 적용되는 설정들을 :root 에 반영 */
 export function applySettings(settings: Settings): void {
   const root = document.documentElement;
   const font = FONT_OPTIONS.find((f) => f.key === settings.fontFamily) ?? FONT_OPTIONS[0];
+  root.dataset.theme = settings.theme;
   root.style.setProperty('--ui-font', font.stack);
   root.style.setProperty('--ui-size', `${settings.fontSize}px`);
   root.style.setProperty('--ui-weight', String(settings.fontWeight));
+  root.style.setProperty('--ui-line', String(settings.lineHeight));
+  root.style.setProperty('--accent', settings.accentColor);
+  root.style.setProperty('--code-size', `${settings.codeFontSize}px`);
 }

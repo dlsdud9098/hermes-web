@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import type { DockviewApi } from 'dockview';
 import { ProjectsProvider, useProjects, uid } from './store/projects';
+import { SettingsProvider } from './store/settings';
 import { ProjectRail } from './components/ProjectRail';
 import { Workspace } from './components/Workspace';
 import { FolderPicker } from './components/FolderPicker';
 import { SettingsModal } from './components/SettingsModal';
-import { applySettings, loadSettings } from './settings';
 import './App.css';
 
 function Shell() {
@@ -15,9 +15,6 @@ function Shell() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   // 활성 Workspace 의 dockview api — 레일 파일 트리에서 뷰어 패널을 열 때 쓴다
   const dockApiRef = useRef<DockviewApi | null>(null);
-
-  // 저장된 외형 설정을 시작 시 적용
-  useEffect(() => { applySettings(loadSettings()); }, []);
 
   return (
     <div className="app">
@@ -60,8 +57,10 @@ function Shell() {
 
 export default function App() {
   return (
-    <ProjectsProvider>
-      <Shell />
-    </ProjectsProvider>
+    <SettingsProvider>
+      <ProjectsProvider>
+        <Shell />
+      </ProjectsProvider>
+    </SettingsProvider>
   );
 }

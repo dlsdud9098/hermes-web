@@ -13,6 +13,7 @@ import { ChatPanel } from './ChatPanel';
 import { PanelTab } from './PanelTab';
 import { FileViewerPanel } from './FileViewer';
 import { useProjects, uid } from '../store/projects';
+import { useSettings } from '../store/settings';
 import type { Project } from '../types';
 
 interface ChatParams { projectId: string }
@@ -35,6 +36,7 @@ interface WorkspaceProps {
 
 export function Workspace({ project, onApiReady }: WorkspaceProps) {
   const { saveLayout } = useProjects();
+  const { settings } = useSettings();
   const apiRef = useRef<DockviewApi | null>(null);
   const counterRef = useRef(1);
 
@@ -99,7 +101,9 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
         </div>
       </div>
       <DockviewReact
-        className="dockview-theme-light workspace-dock"
+        className={`workspace-dock dockview-theme-${
+          settings.theme === 'dark' ? 'abyss' : 'light'
+        }`}
         components={components}
         defaultTabComponent={PanelTab}
         onReady={onReady}
