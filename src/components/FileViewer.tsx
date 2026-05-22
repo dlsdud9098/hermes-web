@@ -138,6 +138,7 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
       {data && (
         <div className="fileviewer-body">
           <CodeMirror
+            className="fv-cm"
             value={draft}
             height="100%"
             theme={settings.theme === 'dark' ? 'dark' : 'light'}

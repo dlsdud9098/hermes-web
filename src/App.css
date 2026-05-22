@@ -349,7 +349,10 @@
   background: rgba(224, 175, 104, 0.12);
 }
 .fileviewer-body { flex: 1; min-height: 0; overflow: hidden; }
+/* @uiw/react-codemirror 래퍼·에디터가 부모 높이를 꽉 채워야 cm-scroller 가 스크롤됨 */
+.fileviewer-body .fv-cm { height: 100%; }
 .fileviewer-body .cm-editor { height: 100%; }
+.fileviewer-body .cm-scroller { overflow: auto; }
 
 /* ── 마크다운 라이브 프리뷰 (codemirror-live-markdown) ── */
 /* 패키지의 editorTheme 가 @uiw/react-codemirror 경유 시 적용 안 돼 직접 보강 */
