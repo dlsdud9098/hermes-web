@@ -1,28 +1,32 @@
-// 파일 뷰어/편집 패널.
-//  - 보기: .md → 마크다운 렌더 / 코드 → 신택스 하이라이트
-//  - 편집: 텍스트area 로 수정 후 저장 (/fs/write)
+// 파일 뷰어/편집 패널 — CodeMirror 기반. 편집 버튼 없이 항상 편집 가능.
+//  - .md → 옵시디언식 라이브 프리뷰 (커서 없는 구간은 렌더, 커서 가면 raw)
+//  - 코드 → 확장자별 신택스 하이라이트
+//  - Ctrl+S 또는 저장 버튼으로 저장 (/fs/write)
 
 import { useEffect, useMemo, useState } from 'react';
-import hljs from 'highlight.js/lib/common';
+import CodeMirror from '@uiw/react-codemirror';
+import { EditorView } from '@codemirror/view';
+import { markdown } from '@codemirror/lang-markdown';
+import { livePreview, livePreviewBaseTheme } from '@yuya296/cm6-live-preview-core';
+import { loadLanguage } from '@uiw/codemirror-extensions-langs';
+import type { Extension } from '@codemirror/state';
 import { readFile, writeFile, type FileContent } from '../api/fs';
-import { Markdown } from './Markdown';
 
-/** 확장자 → highlight.js 언어 id */
+/** 확장자 → @uiw/codemirror-extensions-langs 언어 키 */
 const EXT_LANG: Record<string, string> = {
-  js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript',
-  ts: 'typescript', tsx: 'typescript',
+  js: 'javascript', jsx: 'jsx', mjs: 'javascript', cjs: 'javascript',
+  ts: 'typescript', tsx: 'tsx',
   py: 'python', rb: 'ruby', go: 'go', rs: 'rust', java: 'java',
   c: 'c', h: 'c', cpp: 'cpp', cc: 'cpp', hpp: 'cpp',
   cs: 'csharp', php: 'php', swift: 'swift', kt: 'kotlin', scala: 'scala',
-  sh: 'bash', bash: 'bash', zsh: 'bash',
-  json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'ini', ini: 'ini',
-  html: 'xml', xml: 'xml', svg: 'xml', css: 'css', scss: 'scss', less: 'less',
-  sql: 'sql', dockerfile: 'dockerfile', lua: 'lua', r: 'r',
+  sh: 'shell', bash: 'shell', zsh: 'shell',
+  json: 'json', yaml: 'yaml', yml: 'yaml', toml: 'toml',
+  html: 'html', xml: 'xml', svg: 'xml', css: 'css', scss: 'sass', less: 'less',
+  sql: 'sql', lua: 'lua',
 };
 
 function extOf(filePath: string): string {
   const base = filePath.split(/[/\\]/).pop() ?? '';
-  if (base.toLowerCase() === 'dockerfile') return 'dockerfile';
   const m = /\.([a-z0-9]+)$/i.exec(base);
   return m ? m[1].toLowerCase() : '';
 }
@@ -30,41 +34,37 @@ function extOf(filePath: string): string {
 export function FileViewerPanel({ filePath }: { filePath: string }) {
   const [data, setData] = useState<FileContent | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setError(null);
     setData(null);
-    setEditing(false);
     readFile(filePath)
-      .then(setData)
+      .then((d) => { setData(d); setDraft(d.content); })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [filePath]);
 
   const ext = extOf(filePath);
   const isMarkdown = ext === 'md' || ext === 'markdown';
+  const dirty = data != null && draft !== data.content;
 
-  const html = useMemo(() => {
-    if (!data || isMarkdown) return null;
-    try {
-      const lang = EXT_LANG[ext];
-      return lang && hljs.getLanguage(lang)
-        ? hljs.highlight(data.content, { language: lang }).value
-        : hljs.highlightAuto(data.content).value;
-    } catch {
-      return null;
+  const extensions = useMemo<Extension[]>(() => {
+    if (isMarkdown) {
+      return [markdown(), livePreviewBaseTheme(), livePreview(), EditorView.lineWrapping];
     }
-  }, [data, ext, isMarkdown]);
+    const key = EXT_LANG[ext];
+    const lang = key ? loadLanguage(key as Parameters<typeof loadLanguage>[0]) : null;
+    return lang ? [lang] : [];
+  }, [isMarkdown, ext]);
 
   async function save() {
+    if (!data || data.truncated || !dirty || saving) return;
     setSaving(true);
     setError(null);
     try {
       await writeFile(filePath, draft);
-      setData((prev) => (prev ? { ...prev, content: draft } : prev));
-      setEditing(false);
+      setData({ ...data, content: draft });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -73,28 +73,23 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
   }
 
   return (
-    <div className="fileviewer">
-      <div className="fileviewer-bar">
-        {editing ? (
-          <>
-            <button className="btn" disabled={saving} onClick={save}>
-              {saving ? '저장 중…' : '저장'}
-            </button>
-            <button className="btn btn-ghost" disabled={saving} onClick={() => setEditing(false)}>
-              취소
-            </button>
-          </>
-        ) : (
-          data && !data.truncated && (
-            <button
-              className="btn btn-ghost"
-              onClick={() => { setDraft(data.content); setEditing(true); }}
-            >
-              편집
-            </button>
-          )
-        )}
-      </div>
+    <div
+      className="fileviewer"
+      onKeyDown={(e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+          e.preventDefault();
+          save();
+        }
+      }}
+    >
+      {dirty && (
+        <div className="fileviewer-bar">
+          <span className="fileviewer-dirty">● 저장 안 됨</span>
+          <button className="btn" disabled={saving} onClick={save}>
+            {saving ? '저장 중…' : '저장 (Ctrl+S)'}
+          </button>
+        </div>
+      )}
 
       {error && <div className="chat-error">⚠ {error}</div>}
       {data?.truncated && (
@@ -102,24 +97,16 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
       )}
 
       {data && (
-        editing ? (
-          <textarea
-            className="fileviewer-edit"
+        <div className="fileviewer-body">
+          <CodeMirror
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            spellCheck={false}
+            height="100%"
+            extensions={extensions}
+            editable={!data.truncated}
+            onChange={setDraft}
+            basicSetup={{ lineNumbers: !isMarkdown, foldGutter: !isMarkdown }}
           />
-        ) : isMarkdown ? (
-          <div className="fileviewer-body fileviewer-md">
-            <Markdown content={data.content} />
-          </div>
-        ) : (
-          <pre className="fileviewer-body fileviewer-pre">
-            {html
-              ? <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} />
-              : <code className="hljs">{data.content}</code>}
-          </pre>
-        )
+        </div>
       )}
     </div>
   );

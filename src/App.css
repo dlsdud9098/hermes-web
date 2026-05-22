@@ -327,12 +327,12 @@
 .fileviewer-bar {
   flex-shrink: 0;
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
-  min-height: 32px;
   padding: 4px 8px;
   border-bottom: 1px solid var(--border);
 }
+.fileviewer-dirty { font-size: 11px; color: #b07d28; margin-right: auto; }
 .fileviewer-note {
   flex-shrink: 0;
   padding: 4px 8px;
@@ -340,22 +340,9 @@
   color: #b07d28;
   background: rgba(224, 175, 104, 0.12);
 }
-.fileviewer-body { flex: 1; overflow: auto; }
-.fileviewer-pre { margin: 0; padding: 10px; }
-.fileviewer-pre code.hljs { font-size: 12px; background: transparent; padding: 0; }
-.fileviewer-md { padding: 12px 16px; }
-.fileviewer-edit {
-  flex: 1;
-  resize: none;
-  border: none;
-  background: var(--bg);
-  color: var(--text);
-  font-family: inherit;
-  font-size: 12px;
-  line-height: 1.5;
-  padding: 10px;
-  outline: none;
-}
+.fileviewer-body { flex: 1; min-height: 0; overflow: hidden; }
+.fileviewer-body .cm-editor { height: 100%; }
+.fileviewer-body .cm-scroller { font-size: 12px; }
 
 .chat-error {
   color: #f7768e;
