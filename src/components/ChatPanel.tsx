@@ -41,7 +41,13 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
     abortRef.current = ac;
     try {
       let acc = '';
-      for await (const delta of streamChat({ projectId, messages: history, signal: ac.signal })) {
+      // 세션 id = panelId. Hermes 가 히스토리를 유지하므로 새 메시지만 전송
+      for await (const delta of streamChat({
+        sessionId: panelId,
+        projectId,
+        message: text,
+        signal: ac.signal,
+      })) {
         acc += delta;
         setLocal([...history, { role: 'assistant', content: acc }]);
       }
