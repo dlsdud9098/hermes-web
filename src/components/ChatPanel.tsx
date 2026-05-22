@@ -86,16 +86,11 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
     setMenuDismissed(false);
   }
 
-  async function send() {
-    const text = draft.trim();
-    if (!text || streaming) return;
+  // 한 턴 실행 — baseHistory 는 user 메시지까지 포함한 히스토리
+  async function runTurn(text: string, baseHistory: ChatMessage[]) {
     setError(null);
-    setDraft('');
-
-    const userMsg: ChatMessage = { role: 'user', content: text };
-    const history = [...messages, userMsg];
     let assistant: ChatMessage = { role: 'assistant', content: '', tools: [] };
-    setLocal([...history, assistant]);
+    setLocal([...baseHistory, assistant]);
     setStreaming(true);
 
     const ac = new AbortController();
@@ -136,7 +131,7 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
         } else if (ev.type === 'error') {
           throw new Error(ev.message);
         }
-        setLocal([...history, assistant]);
+        setLocal([...baseHistory, assistant]);
       }
     } catch (err) {
       if (ac.signal.aborted) {
@@ -145,13 +140,28 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
         const msg = err instanceof HermesApiError ? err.message
           : err instanceof Error ? err.message : String(err);
         setError(msg);
-        setLocal(history); // 빈 assistant 자리 제거
+        setLocal(baseHistory); // 빈 assistant 자리 제거
       }
     } finally {
       setStreaming(false);
       setPendingApproval(null);
       abortRef.current = null;
     }
+  }
+
+  function send() {
+    const text = draft.trim();
+    if (!text || streaming) return;
+    setDraft('');
+    runTurn(text, [...messages, { role: 'user', content: text }]);
+  }
+
+  // 마지막 assistant 응답을 버리고 마지막 user 메시지를 다시 실행
+  function regenerate() {
+    if (streaming) return;
+    const lastUserIdx = messages.map((m) => m.role).lastIndexOf('user');
+    if (lastUserIdx < 0) return;
+    runTurn(messages[lastUserIdx].content, messages.slice(0, lastUserIdx + 1));
   }
 
   function stop() {
@@ -220,6 +230,10 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
                 </>
               ) : m.content}
             </div>
+            {m.role === 'assistant' && i === messages.length - 1
+              && !streaming && m.content && (
+              <button className="msg-action" onClick={regenerate}>↻ 재생성</button>
+            )}
           </div>
         ))}
         {pendingApproval && (

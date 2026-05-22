@@ -165,6 +165,18 @@
 .msg-user .msg-body { color: var(--accent); }
 .msg-assistant .msg-body { color: var(--text); }
 
+.msg-action {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 2px 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.msg-action:hover { color: var(--accent); border-color: var(--accent); }
+
 /* ── 마크다운 렌더링 (에이전트 응답) ───────────── */
 .markdown { white-space: normal; line-height: 1.55; }
 .markdown > :first-child { margin-top: 0; }
