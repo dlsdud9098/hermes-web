@@ -384,6 +384,14 @@
 }
 .cm-content .cm-highlight { background: rgba(255, 220, 0, 0.35); border-radius: 2px; }
 .cm-content .cm-link { color: var(--accent); text-decoration: underline; }
+/* 코드블록 위젯의 ``` 펜스 줄 숨김 */
+.cm-content .cm-codeblock-fence { display: none; }
+/* 작업목록 체크박스 */
+.cm-task-checkbox {
+  margin: 0 6px 0 0;
+  vertical-align: -1px;
+  cursor: pointer;
+}
 
 .chat-error {
   color: #f7768e;

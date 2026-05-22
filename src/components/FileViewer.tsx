@@ -9,6 +9,7 @@ import { EditorView } from '@codemirror/view';
 import { EditorState, type Extension } from '@codemirror/state';
 import { indentUnit } from '@codemirror/language';
 import { markdown } from '@codemirror/lang-markdown';
+import { GFM } from '@lezer/markdown';
 import {
   livePreviewPlugin, markdownStylePlugin, editorTheme,
   mouseSelectingField, collapseOnSelectionFacet,
@@ -17,6 +18,7 @@ import {
 import { loadLanguage } from '@uiw/codemirror-extensions-langs';
 import { readFile, writeFile, type FileContent } from '../api/fs';
 import { useSettings } from '../store/settings';
+import { taskCheckboxes } from './mdCheckbox';
 
 // 코드블록 신택스 하이라이터 1회 초기화 (lowlight)
 void initHighlighter();
@@ -68,7 +70,7 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
     ];
     if (settings.wordWrap || isMarkdown) list.push(EditorView.lineWrapping);
     if (isMarkdown) {
-      list.push(markdown());
+      list.push(markdown({ extensions: [GFM] }));
       if (settings.mdLivePreview) {
         list.push(
           collapseOnSelectionFacet.of(true),
@@ -76,6 +78,7 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
           livePreviewPlugin,
           markdownStylePlugin,
           codeBlockField({ copyButton: true }),
+          taskCheckboxes,
           editorTheme,
         );
       }
