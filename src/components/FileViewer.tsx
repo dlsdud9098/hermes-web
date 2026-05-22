@@ -1,10 +1,10 @@
-// 파일 내용 읽기 전용 뷰어 패널.
-//  - .md/.markdown → 마크다운 렌더링 (옵시디언 느낌)
-//  - 코드 파일 → 확장자 기반 신택스 하이라이트 (VS Code 느낌)
+// 파일 뷰어/편집 패널.
+//  - 보기: .md → 마크다운 렌더 / 코드 → 신택스 하이라이트
+//  - 편집: 텍스트area 로 수정 후 저장 (/fs/write)
 
 import { useEffect, useMemo, useState } from 'react';
 import hljs from 'highlight.js/lib/common';
-import { readFile, type FileContent } from '../api/fs';
+import { readFile, writeFile, type FileContent } from '../api/fs';
 import { Markdown } from './Markdown';
 
 /** 확장자 → highlight.js 언어 id */
@@ -30,10 +30,14 @@ function extOf(filePath: string): string {
 export function FileViewerPanel({ filePath }: { filePath: string }) {
   const [data, setData] = useState<FileContent | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setError(null);
     setData(null);
+    setEditing(false);
     readFile(filePath)
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
@@ -54,26 +58,68 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
     }
   }, [data, ext, isMarkdown]);
 
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      await writeFile(filePath, draft);
+      setData((prev) => (prev ? { ...prev, content: draft } : prev));
+      setEditing(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="fileviewer">
+      <div className="fileviewer-bar">
+        {editing ? (
+          <>
+            <button className="btn" disabled={saving} onClick={save}>
+              {saving ? '저장 중…' : '저장'}
+            </button>
+            <button className="btn btn-ghost" disabled={saving} onClick={() => setEditing(false)}>
+              취소
+            </button>
+          </>
+        ) : (
+          data && !data.truncated && (
+            <button
+              className="btn btn-ghost"
+              onClick={() => { setDraft(data.content); setEditing(true); }}
+            >
+              편집
+            </button>
+          )
+        )}
+      </div>
+
       {error && <div className="chat-error">⚠ {error}</div>}
+      {data?.truncated && (
+        <div className="fileviewer-note">⚠ 256KB 초과 — 일부만 표시 (편집 불가)</div>
+      )}
+
       {data && (
-        <>
-          {data.truncated && (
-            <div className="fileviewer-note">⚠ 256KB 초과 — 일부만 표시</div>
-          )}
-          {isMarkdown ? (
-            <div className="fileviewer-md">
-              <Markdown content={data.content} />
-            </div>
-          ) : (
-            <pre className="fileviewer-pre">
-              {html
-                ? <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} />
-                : <code className="hljs">{data.content}</code>}
-            </pre>
-          )}
-        </>
+        editing ? (
+          <textarea
+            className="fileviewer-edit"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            spellCheck={false}
+          />
+        ) : isMarkdown ? (
+          <div className="fileviewer-body fileviewer-md">
+            <Markdown content={data.content} />
+          </div>
+        ) : (
+          <pre className="fileviewer-body fileviewer-pre">
+            {html
+              ? <code className="hljs" dangerouslySetInnerHTML={{ __html: html }} />
+              : <code className="hljs">{data.content}</code>}
+          </pre>
+        )
       )}
     </div>
   );

@@ -43,3 +43,16 @@ export async function readFile(filePath: string): Promise<FileContent> {
   }
   return res.json() as Promise<FileContent>;
 }
+
+/** 파일 내용 저장 */
+export async function writeFile(filePath: string, content: string): Promise<void> {
+  const res = await fetch('/fs/write', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path: filePath, content }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(body.error ?? `파일 저장 실패 (${res.status})`);
+  }
+}

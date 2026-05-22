@@ -120,6 +120,28 @@ function fsBrowserPlugin(): Plugin {
           return
         }
 
+        // 파일 내용 저장
+        if (req.url.startsWith('/fs/write') && req.method === 'POST') {
+          let body = ''
+          req.on('data', (chunk) => { body += chunk })
+          req.on('end', () => {
+            try {
+              const parsed = JSON.parse(body) as { path?: string; content?: string }
+              if (!parsed.path || typeof parsed.content !== 'string') {
+                res.statusCode = 400
+                res.end(JSON.stringify({ error: 'path/content 누락' }))
+                return
+              }
+              fs.writeFileSync(path.resolve(parsed.path), parsed.content, 'utf-8')
+              res.end(JSON.stringify({ ok: true }))
+            } catch (err) {
+              res.statusCode = 400
+              res.end(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }))
+            }
+          })
+          return
+        }
+
         // 설치된 Hermes 스킬 목록
         if (req.url.startsWith('/fs/skills')) {
           try {

@@ -317,21 +317,45 @@
 .tree-ic { flex-shrink: 0; }
 .tree-file { color: var(--text-dim); }
 
-/* ── 파일 뷰어 패널 ─────────────────────────── */
+/* ── 파일 뷰어/편집 패널 ────────────────────── */
 .fileviewer {
   height: 100%;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
   background: var(--bg-panel);
 }
+.fileviewer-bar {
+  flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
 .fileviewer-note {
+  flex-shrink: 0;
   padding: 4px 8px;
   font-size: 11px;
   color: #b07d28;
   background: rgba(224, 175, 104, 0.12);
 }
+.fileviewer-body { flex: 1; overflow: auto; }
 .fileviewer-pre { margin: 0; padding: 10px; }
 .fileviewer-pre code.hljs { font-size: 12px; background: transparent; padding: 0; }
 .fileviewer-md { padding: 12px 16px; }
+.fileviewer-edit {
+  flex: 1;
+  resize: none;
+  border: none;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px;
+  outline: none;
+}
 
 .chat-error {
   color: #f7768e;
