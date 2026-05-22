@@ -3,16 +3,21 @@ import { ProjectsProvider, useProjects } from './store/projects';
 import { ProjectRail } from './components/ProjectRail';
 import { Workspace } from './components/Workspace';
 import { FolderPicker } from './components/FolderPicker';
+import { SettingsModal } from './components/SettingsModal';
 import './App.css';
 
 function Shell() {
   const { projects, activeId, openProject } = useProjects();
   const active = projects.find((p) => p.id === activeId) ?? projects[0];
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <div className="app">
-      <ProjectRail onOpenFolder={() => setPickerOpen(true)} />
+      <ProjectRail
+        onOpenFolder={() => setPickerOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
       {active ? (
         // key={active.id} → 프로젝트 전환 시 Workspace remount, 레이아웃 복원
         <Workspace key={active.id} project={active} />
@@ -29,6 +34,7 @@ function Shell() {
           onPick={(path) => { openProject(path); setPickerOpen(false); }}
         />
       )}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

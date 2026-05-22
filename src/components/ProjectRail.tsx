@@ -5,9 +5,10 @@ import { useProjects } from '../store/projects';
 
 interface ProjectRailProps {
   onOpenFolder: () => void;
+  onOpenSettings: () => void;
 }
 
-export function ProjectRail({ onOpenFolder }: ProjectRailProps) {
+export function ProjectRail({ onOpenFolder, onOpenSettings }: ProjectRailProps) {
   const { projects, activeId, setActive, removeProject } = useProjects();
 
   return (
@@ -27,6 +28,9 @@ export function ProjectRail({ onOpenFolder }: ProjectRailProps) {
       ))}
       <button className="rail-add" onClick={onOpenFolder} title="폴더 열기">
         +
+      </button>
+      <button className="rail-settings" onClick={onOpenSettings} title="설정">
+        ⚙
       </button>
     </nav>
   );
