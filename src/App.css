@@ -174,11 +174,53 @@
 }
 
 .chat-composer {
+  position: relative;
   flex-shrink: 0;
   display: flex;
   gap: 6px;
   padding: 8px;
   border-top: 1px solid var(--border);
+}
+
+/* ── 슬래시 스킬 자동완성 메뉴 ─────────────────── */
+.skill-menu {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(100% - 2px);
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.18);
+  z-index: 50;
+}
+
+.skill-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 5px 10px;
+  background: transparent;
+  border: none;
+  text-align: left;
+}
+.skill-item-active { background: var(--bg-bar); }
+.skill-item:hover { background: var(--bg-bar); }
+
+.skill-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.skill-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chat-composer textarea {
