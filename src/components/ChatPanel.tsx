@@ -2,12 +2,25 @@
 // 컴포저에서 '/' 로 시작하면 스킬 자동완성 메뉴가 뜬다 (Claude Code 식).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { streamChat, HermesApiError } from '../api/hermes';
+import { streamRun, HermesApiError } from '../api/hermes';
 import { listSkills, type Skill } from '../api/skills';
 import { useProjects } from '../store/projects';
 import { SkillMenu } from './SkillMenu';
 import { Markdown } from './Markdown';
-import type { ChatMessage } from '../types';
+import { ToolCard } from './ToolCard';
+import type { ChatMessage, ToolCall } from '../types';
+
+/** tool-end 이벤트를 받아 마지막 running 상태의 동명 툴을 완료 처리 */
+function completeTool(tools: ToolCall[], tool: string, duration: number, error: boolean): ToolCall[] {
+  const next = [...tools];
+  for (let i = next.length - 1; i >= 0; i--) {
+    if (next[i].status === 'running' && next[i].tool === tool) {
+      next[i] = { ...next[i], status: error ? 'error' : 'done', duration };
+      break;
+    }
+  }
+  return next;
+}
 
 interface ChatPanelProps {
   panelId: string;
@@ -71,24 +84,40 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
 
     const userMsg: ChatMessage = { role: 'user', content: text };
     const history = [...messages, userMsg];
-    setLocal([...history, { role: 'assistant', content: '' }]);
+    let assistant: ChatMessage = { role: 'assistant', content: '', tools: [] };
+    setLocal([...history, assistant]);
     setStreaming(true);
 
     const ac = new AbortController();
     abortRef.current = ac;
     try {
-      let acc = '';
       // 세션 id = panelId. Hermes 가 히스토리를 유지하므로 새 메시지만 전송.
       // 메시지가 '/스킬명' 이면 Hermes 가 슬래시 명령으로 해석해 스킬을 실행.
-      for await (const delta of streamChat({
+      for await (const ev of streamRun({
         sessionId: panelId,
         projectId,
         projectPath,
         message: text,
         signal: ac.signal,
       })) {
-        acc += delta;
-        setLocal([...history, { role: 'assistant', content: acc }]);
+        if (ev.type === 'text') {
+          assistant = { ...assistant, content: assistant.content + ev.delta };
+        } else if (ev.type === 'tool-start') {
+          assistant = {
+            ...assistant,
+            tools: [...(assistant.tools ?? []), { tool: ev.tool, preview: ev.preview, status: 'running' }],
+          };
+        } else if (ev.type === 'tool-end') {
+          assistant = {
+            ...assistant,
+            tools: completeTool(assistant.tools ?? [], ev.tool, ev.duration, ev.error),
+          };
+        } else if (ev.type === 'done') {
+          if (!assistant.content && ev.output) assistant = { ...assistant, content: ev.output };
+        } else if (ev.type === 'error') {
+          throw new Error(ev.message);
+        }
+        setLocal([...history, assistant]);
       }
     } catch (err) {
       if (ac.signal.aborted) {
@@ -149,9 +178,14 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
           <div key={i} className={`msg msg-${m.role}`}>
             <span className="msg-role">{m.role}</span>
             <div className="msg-body">
-              {m.role === 'assistant'
-                ? (m.content ? <Markdown content={m.content} /> : (streaming ? '…' : ''))
-                : m.content}
+              {m.role === 'assistant' ? (
+                <>
+                  {m.tools?.map((t, ti) => <ToolCard key={ti} tool={t} />)}
+                  {m.content
+                    ? <Markdown content={m.content} />
+                    : (streaming && !m.tools?.length ? '…' : null)}
+                </>
+              ) : m.content}
             </div>
           </div>
         ))}

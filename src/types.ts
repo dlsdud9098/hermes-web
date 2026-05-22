@@ -1,8 +1,20 @@
 // 도메인 타입 — 프로젝트(세로 탭) / 패널(세션) / 메시지
 
+/** 에이전트 턴 중 실행된 툴 호출 1건 */
+export interface ToolCall {
+  tool: string;
+  /** 실행 미리보기 (예: 셸 명령) */
+  preview: string;
+  status: 'running' | 'done' | 'error';
+  /** 완료까지 걸린 초 */
+  duration?: number;
+}
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  /** assistant 턴에서 실행된 툴들 (있을 때만) */
+  tools?: ToolCall[];
 }
 
 export interface Project {

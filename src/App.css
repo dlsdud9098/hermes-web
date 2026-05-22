@@ -211,6 +211,36 @@
 .code-block pre { margin: 0; padding: 8px 10px; overflow-x: auto; }
 .code-block code.hljs { font-size: 12px; background: transparent; padding: 0; }
 
+/* ── 툴 호출 카드 ──────────────────────────── */
+.tool-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-bar);
+  font-size: 11px;
+}
+.tool-icon { flex-shrink: 0; display: inline-block; }
+.tool-running .tool-icon { color: var(--accent); animation: tool-spin 1s linear infinite; }
+.tool-done .tool-icon { color: #2ea043; }
+.tool-error .tool-icon { color: #f7768e; }
+@keyframes tool-spin { to { transform: rotate(360deg); } }
+.tool-name { font-weight: 600; flex-shrink: 0; }
+.tool-preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-dim);
+  background: transparent;
+  padding: 0;
+}
+.tool-dur { flex-shrink: 0; color: var(--text-dim); }
+
 .chat-error {
   color: #f7768e;
   font-size: 12px;
