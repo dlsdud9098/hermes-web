@@ -18,29 +18,22 @@ function basename(path: string): string {
   return parts.length ? parts[parts.length - 1] : (path || '프로젝트');
 }
 
-/** 패널(세션) → 소속 프로젝트 매핑. 닫힌 세션도 히스토리에서 찾으려고 보관 */
-type SessionMeta = Record<string, { projectId: string }>;
-
 interface ProjectsContextValue {
   projects: Project[];
   activeId: string;
   messages: Record<string, ChatMessage[]>;
-  sessionMeta: SessionMeta;
   /** 폴더 경로로 프로젝트를 연다. 이름은 폴더명에서 자동 도출 */
   openProject: (path: string) => void;
   removeProject: (id: string) => void;
   setActive: (id: string) => void;
   saveLayout: (projectId: string, layout: unknown) => void;
   setMessages: (panelId: string, messages: ChatMessage[]) => void;
-  /** 패널이 어느 프로젝트 소속인지 1회 기록 (세션 히스토리용) */
-  recordSession: (panelId: string, projectId: string) => void;
 }
 
 interface PersistedState {
   projects: Project[];
   activeId: string;
   messages: Record<string, ChatMessage[]>;
-  sessionMeta: SessionMeta;
 }
 
 const ProjectsContext = createContext<ProjectsContextValue | null>(null);
@@ -66,12 +59,7 @@ function loadState(): PersistedState | null {
     const activeId = projects.some((p) => p.id === parsed.activeId)
       ? (parsed.activeId as string)
       : (projects[0]?.id ?? '');
-    return {
-      projects,
-      activeId,
-      messages: parsed.messages ?? {},
-      sessionMeta: parsed.sessionMeta ?? {},
-    };
+    return { projects, activeId, messages: parsed.messages ?? {} };
   } catch {
     return null;
   }
@@ -85,19 +73,16 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const [messages, setMessagesState] = useState<Record<string, ChatMessage[]>>(
     () => restored?.messages ?? {},
   );
-  const [sessionMeta, setSessionMeta] = useState<SessionMeta>(
-    () => restored?.sessionMeta ?? {},
-  );
 
   // 변경 시마다 localStorage 동기화
   useEffect(() => {
     try {
-      const state: PersistedState = { projects, activeId, messages, sessionMeta };
+      const state: PersistedState = { projects, activeId, messages };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
       // 용량 초과 / 비활성화 — 무시 (영속화 실패해도 앱은 동작)
     }
-  }, [projects, activeId, messages, sessionMeta]);
+  }, [projects, activeId, messages]);
 
   const openProject = useCallback((path: string) => {
     const trimmed = path.trim();
@@ -127,17 +112,12 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     setMessagesState((prev) => ({ ...prev, [panelId]: msgs }));
   }, []);
 
-  const recordSession = useCallback((panelId: string, projectId: string) => {
-    setSessionMeta((prev) => (prev[panelId] ? prev : { ...prev, [panelId]: { projectId } }));
-  }, []);
-
   const value = useMemo<ProjectsContextValue>(
     () => ({
-      projects, activeId, messages, sessionMeta,
-      openProject, removeProject, setActive, saveLayout, setMessages, recordSession,
+      projects, activeId, messages,
+      openProject, removeProject, setActive, saveLayout, setMessages,
     }),
-    [projects, activeId, messages, sessionMeta,
-      openProject, removeProject, setActive, saveLayout, setMessages, recordSession],
+    [projects, activeId, messages, openProject, removeProject, setActive, saveLayout, setMessages],
   );
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;

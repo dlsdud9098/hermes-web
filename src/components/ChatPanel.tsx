@@ -38,7 +38,7 @@ interface ChatPanelProps {
 const MAX_SKILL_RESULTS = 60;
 
 export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
-  const { messages: store, setMessages, projects, recordSession } = useProjects();
+  const { messages: store, setMessages, projects } = useProjects();
   const projectPath = projects.find((p) => p.id === projectId)?.path ?? '';
   const [messages, setLocal] = useState<ChatMessage[]>(() => store[panelId] ?? []);
   const [draft, setDraft] = useState('');
@@ -54,11 +54,6 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
 
   // 로컬 상태 → store 동기화 (패널 remount 시에도 히스토리 유지)
   useEffect(() => { setMessages(panelId, messages); }, [messages, panelId, setMessages]);
-
-  // 세션 → 프로젝트 소속 1회 기록 (세션 히스토리용)
-  useEffect(() => {
-    recordSession(panelId, projectId);
-  }, [panelId, projectId, recordSession]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });

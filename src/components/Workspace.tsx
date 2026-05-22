@@ -13,7 +13,6 @@ import { ChatPanel } from './ChatPanel';
 import { PanelTab } from './PanelTab';
 import { FileTreePanel } from './FileTree';
 import { FileViewerPanel } from './FileViewer';
-import { SessionHistoryPanel } from './SessionHistory';
 import { useProjects, uid } from '../store/projects';
 import type { Project } from '../types';
 import type { DirEntry } from '../api/fs';
@@ -39,24 +38,6 @@ const components = {
   ),
   fileviewer: (props: IDockviewPanelProps<ViewerParams>) => (
     <FileViewerPanel filePath={props.params.filePath} />
-  ),
-  sessionhistory: (props: IDockviewPanelProps<ChatParams>) => (
-    <SessionHistoryPanel
-      projectId={props.params.projectId}
-      onOpenSession={(panelId, title) => {
-        const existing = props.containerApi.getPanel(panelId);
-        if (existing) {
-          existing.focus();
-          return;
-        }
-        props.containerApi.addPanel({
-          id: panelId,
-          component: 'chat',
-          title: title.slice(0, 24) || '세션',
-          params: { projectId: props.params.projectId },
-        });
-      }}
-    />
   ),
 };
 
@@ -109,43 +90,33 @@ export function Workspace({ project }: { project: Project }) {
     });
   }, [project.id]);
 
-  // 파일 트리 패널 토글 (싱글톤 — 고정 id, 있으면 닫음)
+  // 파일 트리 패널 토글 (VS Code 사이드바식 3-상태):
+  //  - 없음     → 왼쪽에 열고 포커스
+  //  - 활성중   → 닫기
+  //  - 비활성   → 포커스만 (닫지 않음)
   const toggleFileTree = useCallback(() => {
     const api = apiRef.current;
     if (!api) return;
     const id = `filetree-${project.id}`;
     const existing = api.getPanel(id);
-    if (existing) {
-      existing.api.close();
+    if (!existing) {
+      api.addPanel({
+        id,
+        component: 'filetree',
+        title: '파일트리',
+        params: { rootPath: project.path },
+        position: { direction: 'left' as const },
+      });
       return;
     }
-    api.addPanel({
-      id,
-      component: 'filetree',
-      title: '파일',
-      params: { rootPath: project.path },
-      position: { direction: 'left' as const },
-    });
+    // isActive 는 '그룹 내 활성 탭' — 단독 패널은 항상 true 라 쓸 수 없다.
+    // isGroupActive 로 '그 패널의 그룹이 포커스됐는지'를 본다.
+    if (existing.api.isGroupActive) {
+      existing.api.close();
+    } else {
+      existing.focus();
+    }
   }, [project.id, project.path]);
-
-  // 세션 히스토리 패널 토글 (싱글톤)
-  const toggleSessionHistory = useCallback(() => {
-    const api = apiRef.current;
-    if (!api) return;
-    const id = `sessionhistory-${project.id}`;
-    const existing = api.getPanel(id);
-    if (existing) {
-      existing.api.close();
-      return;
-    }
-    api.addPanel({
-      id,
-      component: 'sessionhistory',
-      title: '세션',
-      params: { projectId: project.id },
-      position: { direction: 'left' as const },
-    });
-  }, [project.id]);
 
   return (
     <div className="workspace">
@@ -154,9 +125,6 @@ export function Workspace({ project }: { project: Project }) {
           {project.name}
         </span>
         <div className="workspace-actions">
-          <button className="btn btn-ghost" onClick={toggleSessionHistory}>
-            세션 기록
-          </button>
           <button className="btn btn-ghost" onClick={toggleFileTree}>
             파일트리
           </button>
