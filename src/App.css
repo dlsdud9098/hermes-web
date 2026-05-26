@@ -875,3 +875,20 @@
 }
 .msg:hover .msg-copy { opacity: 1; }
 .msg-copy:hover { color: var(--accent); border-color: var(--accent); }
+
+/* 폴더 피커 — 경로 직접 입력 가능 */
+.picker-path-input {
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-family: var(--code-font, monospace);
+  color: var(--text);
+  background: var(--bg-bar);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  outline: none;
+}
+.picker-path-input:focus {
+  background: var(--bg);
+  border-bottom-color: var(--accent);
+}

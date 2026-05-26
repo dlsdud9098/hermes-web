@@ -13,12 +13,16 @@ export function FolderPicker({ onPick, onClose }: FolderPickerProps) {
   const [listing, setListing] = useState<DirListing | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // 경로 입력란 draft — listing 변하면 동기화, 사용자 타이핑은 자유 편집
+  const [pathDraft, setPathDraft] = useState('');
 
   const go = useCallback(async (path?: string) => {
     setLoading(true);
     setError(null);
     try {
-      setListing(await listDir(path));
+      const next = await listDir(path);
+      setListing(next);
+      setPathDraft(next.path);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -28,6 +32,11 @@ export function FolderPicker({ onPick, onClose }: FolderPickerProps) {
 
   useEffect(() => { go(); }, [go]);
 
+  const submitPath = () => {
+    const p = pathDraft.trim();
+    if (p) void go(p);
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="picker" onClick={(e) => e.stopPropagation()}>
@@ -35,7 +44,17 @@ export function FolderPicker({ onPick, onClose }: FolderPickerProps) {
           <span className="picker-title">폴더 열기</span>
           <button className="picker-x" onClick={onClose}>✕</button>
         </div>
-        <div className="picker-path">{listing?.path ?? '…'}</div>
+        <input
+          className="picker-path-input"
+          value={pathDraft}
+          onChange={(e) => setPathDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); submitPath(); }
+            else if (e.key === 'Escape') { e.preventDefault(); setPathDraft(listing?.path ?? ''); }
+          }}
+          spellCheck={false}
+          placeholder="경로 입력 후 Enter (예: /home/inyoung/projects)"
+        />
         <div className="picker-list">
           {loading && <div className="picker-dim">불러오는 중…</div>}
           {error && <div className="chat-error">⚠ {error}</div>}
