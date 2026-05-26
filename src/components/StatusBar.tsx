@@ -184,16 +184,17 @@ function UsagePill({ label, pct, reset, onClick, loading }: PillProps) {
   return (
     <span
       className="statusbar-item statusbar-clickable statusbar-usage"
-      title={`${label}: ${pct.toFixed(1)}% 사용 (${remaining.toFixed(1)}% 남음) · 리셋 ${fmtRemaining(reset)} 후`}
+      title={`${label}: ${remaining.toFixed(1)}% 남음 (${pct.toFixed(1)}% 사용) · 리셋 ${fmtRemaining(reset)} 후`}
       onClick={onClick}
     >
       {loading ? '⌛' : (
         <>
           <span className="statusbar-pill-label">{label}</span>
+          {/* 막대는 남은 양 — 가득 차있다가 줄어드는 게이지 */}
           <span className="statusbar-pill-bar">
             <span
               className="statusbar-pill-fill"
-              style={{ width: `${Math.min(100, pct)}%`, background: color }}
+              style={{ width: `${Math.min(100, remaining)}%`, background: color }}
             />
           </span>
           <span className="statusbar-pill-pct" style={{ color }}>
