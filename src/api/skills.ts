@@ -1,5 +1,6 @@
-// 설치된 Hermes 스킬 목록 — vite 개발 미들웨어(/fs/skills)에서 가져온다.
-// 스킬은 채팅에서 '/스킬명' 슬래시 명령으로 호출된다 (Hermes 가 네이티브 처리).
+// 설치된 Hermes 스킬 목록. Tauri → invoke('fs_skills'), 브라우저 → /fs/skills.
+
+import { invoke, isTauri } from '../runtime';
 
 export interface Skill {
   name: string;
@@ -8,9 +9,14 @@ export interface Skill {
 
 let cache: Skill[] | null = null;
 
-/** 스킬 목록 조회 (최초 1회만 네트워크, 이후 캐시) */
+/** 스킬 목록 조회 (최초 1회만 IO, 이후 캐시) */
 export async function listSkills(): Promise<Skill[]> {
   if (cache) return cache;
+  if (isTauri) {
+    const data = await invoke<{ skills: Skill[] }>('fs_skills');
+    cache = data.skills ?? [];
+    return cache;
+  }
   const res = await fetch('/fs/skills');
   if (!res.ok) throw new Error(`스킬 목록 조회 실패 (${res.status})`);
   const data = (await res.json()) as { skills: Skill[] };

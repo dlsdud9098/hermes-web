@@ -13,8 +13,14 @@ export const PROJECT_MARKER = 'hermes-web:project=';
 /** 프로젝트 작업 폴더 마커 */
 export const CWD_MARKER = 'hermes-web:cwd=';
 
+import { httpFetch, isTauri } from '../runtime';
+
 // 로컬 전용 — 연결 정보는 .env 빌드타임 값으로 고정.
-const DEFAULT_BASE = (import.meta.env.VITE_HERMES_BASE as string | undefined) ?? '/api/v1';
+// Tauri: vite 프록시가 없으므로 게이트웨이 직접 호출 (plugin-http 로 CORS/Origin 우회).
+// 브라우저: vite proxy 의 /api 경유.
+const ENV_BASE = import.meta.env.VITE_HERMES_BASE as string | undefined;
+const DEFAULT_BASE = ENV_BASE
+  ?? (isTauri ? 'http://localhost:8642/v1' : '/api/v1');
 const DEFAULT_KEY = import.meta.env.VITE_HERMES_KEY as string | undefined;
 
 export class HermesApiError extends Error {
@@ -121,7 +127,7 @@ export async function* streamRun(opts: StreamRunOptions): AsyncGenerator<RunEven
   };
 
   // 1) 런 생성
-  const createRes = await fetch(`${base}/runs`, {
+  const createRes = await httpFetch(`${base}/runs`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ input: content }),
@@ -137,13 +143,13 @@ export async function* streamRun(opts: StreamRunOptions): AsyncGenerator<RunEven
 
   // 중단 시 서버측 런도 정지
   const onAbort = () => {
-    fetch(`${base}/runs/${runId}/stop`, { method: 'POST', headers }).catch(() => {});
+    httpFetch(`${base}/runs/${runId}/stop`, { method: 'POST', headers }).catch(() => {});
   };
   opts.signal?.addEventListener('abort', onAbort);
 
   try {
     // 2) 이벤트 SSE 스트림
-    const evRes = await fetch(`${base}/runs/${runId}/events`, { headers, signal: opts.signal });
+    const evRes = await httpFetch(`${base}/runs/${runId}/events`, { headers, signal: opts.signal });
     if (!evRes.ok || !evRes.body) {
       const detail = await evRes.text().catch(() => '');
       throw new HermesApiError(evRes.status, detail.slice(0, 300));
@@ -193,7 +199,7 @@ export async function approveRun(
 ): Promise<void> {
   const base = opts?.baseUrl ?? DEFAULT_BASE;
   const key = opts?.apiKey ?? DEFAULT_KEY;
-  const res = await fetch(`${base}/runs/${runId}/approval`, {
+  const res = await httpFetch(`${base}/runs/${runId}/approval`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

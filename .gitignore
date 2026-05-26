@@ -35,3 +35,7 @@ __pycache__/
 # 툴 생성물
 .openchrome/
 docs/sessions/
+
+# Tauri 빌드 산출물 (Cargo.lock 은 바이너리 앱이므로 커밋)
+src-tauri/target/
+src-tauri/gen/
