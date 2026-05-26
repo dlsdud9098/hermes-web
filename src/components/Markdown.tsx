@@ -56,6 +56,16 @@ const components: Components = {
       ? <CodeBlock code={text.replace(/\n$/, '')} lang={lang} />
       : <code className="inline-code">{children}</code>;
   },
+  // 이미지 — 클릭 시 새 탭/창에 원본 크기로 열기
+  img: ({ src, alt }) => (
+    <img
+      className="md-image"
+      src={typeof src === 'string' ? src : ''}
+      alt={alt ?? ''}
+      loading="lazy"
+      onClick={() => { if (typeof src === 'string') window.open(src, '_blank'); }}
+    />
+  ),
 };
 
 export function Markdown({ content }: { content: string }): ReactNode {

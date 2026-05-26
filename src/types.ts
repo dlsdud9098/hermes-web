@@ -12,6 +12,18 @@ export interface ToolCall {
   id?: string;
 }
 
+/** 이미지 첨부 — base64 data URL 만 보관 */
+export interface ImageAttachment {
+  /** 'data:image/<type>;base64,<...>' */
+  dataUrl: string;
+  /** UI 표시용 원본 파일명 (있으면) */
+  name?: string;
+  /** MIME (image/png 등) */
+  mime: string;
+  /** 바이트 길이 (UI 표시용) */
+  size: number;
+}
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -23,6 +35,8 @@ export interface ChatMessage {
   durationMs?: number;
   /** 스트리밍 진행 중 (Claude Code 패널) */
   streaming?: boolean;
+  /** 사용자 첨부 이미지 (user role 메시지) */
+  attachments?: ImageAttachment[];
 }
 
 export interface ProjectTab {

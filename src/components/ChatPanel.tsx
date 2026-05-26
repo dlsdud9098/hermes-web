@@ -11,7 +11,7 @@ import { Markdown } from './Markdown';
 import { ToolCard } from './ToolCard';
 import { ApprovalCard } from './ApprovalCard';
 import { CopyButton } from './CopyButton';
-import type { ChatMessage, ToolCall } from '../types';
+import type { ChatMessage, ToolCall, ImageAttachment } from '../types';
 
 interface PendingApproval {
   runId: string;
@@ -52,8 +52,27 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
   const [menuDismissed, setMenuDismissed] = useState(false);
   const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
   const [approvalBusy, setApprovalBusy] = useState(false);
+  const [attachments, setAttachments] = useState<ImageAttachment[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 이미지 파일 → base64 data URL 변환 후 첨부 목록에 추가
+  function addImageFile(file: File) {
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result ?? '');
+      if (!dataUrl) return;
+      setAttachments((prev) => [...prev, {
+        dataUrl, name: file.name, mime: file.type, size: file.size,
+      }]);
+    };
+    reader.readAsDataURL(file);
+  }
+  function removeAttachment(idx: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  }
 
   // 로컬 상태 → store 동기화 (패널 remount 시에도 히스토리 유지)
   useEffect(() => { setMessages(panelId, messages); }, [messages, panelId, setMessages]);
@@ -92,7 +111,7 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
   }
 
   // 한 턴 실행 — baseHistory 는 user 메시지까지 포함한 히스토리
-  async function runTurn(text: string, baseHistory: ChatMessage[]) {
+  async function runTurn(text: string, baseHistory: ChatMessage[], images?: ImageAttachment[]) {
     setError(null);
     let assistant: ChatMessage = { role: 'assistant', content: '', tools: [] };
     setLocal([...baseHistory, assistant]);
@@ -109,6 +128,7 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
         projectId,
         projectPath,
         message: text,
+        images: images?.map((a) => ({ dataUrl: a.dataUrl, mime: a.mime })),
         signal: ac.signal,
       })) {
         if (ev.type === 'text') {
@@ -162,9 +182,15 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
 
   function send() {
     const text = draft.trim();
-    if (!text || streaming) return;
+    if ((!text && attachments.length === 0) || streaming) return;
+    const imgs = attachments;
     setDraft('');
-    runTurn(text, [...messages, { role: 'user', content: text }]);
+    setAttachments([]);
+    runTurn(
+      text,
+      [...messages, { role: 'user', content: text, attachments: imgs }],
+      imgs,
+    );
   }
 
   function stop() {
@@ -238,7 +264,25 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
                     ? <Markdown content={m.content} />
                     : (streaming && !m.tools?.length ? '…' : null)}
                 </>
-              ) : m.content}
+              ) : (
+                <>
+                  {m.attachments && m.attachments.length > 0 && (
+                    <div className="msg-images">
+                      {m.attachments.map((a, ai) => (
+                        <img
+                          key={ai}
+                          className="msg-image"
+                          src={a.dataUrl}
+                          alt={a.name ?? '첨부'}
+                          loading="lazy"
+                          onClick={() => window.open(a.dataUrl, '_blank')}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {m.content}
+                </>
+              )}
             </div>
             {m.role === 'assistant'
               && ((settings.showTiming && m.durationMs != null)
@@ -265,20 +309,67 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
         )}
         {error && <div className="chat-error">⚠ {error}</div>}
       </div>
-      <div className="chat-composer">
+      <div
+        className="chat-composer"
+        onPaste={(e) => {
+          // 클립보드에 이미지 있으면 첨부
+          for (const item of Array.from(e.clipboardData?.items ?? [])) {
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+              const f = item.getAsFile();
+              if (f) { addImageFile(f); e.preventDefault(); }
+            }
+          }
+        }}
+        onDragOver={(e) => { e.preventDefault(); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          for (const f of Array.from(e.dataTransfer.files)) addImageFile(f);
+        }}
+      >
         {menuOpen && (
           <SkillMenu skills={filteredSkills} selectedIndex={skillIndex} onPick={pickSkill} />
         )}
-        <textarea
-          value={draft}
-          onChange={(e) => { setDraft(e.target.value); setMenuDismissed(false); }}
-          onKeyDown={onKeyDown}
-          placeholder="메시지… (Enter 전송, Shift+Enter 줄바꿈, / 스킬)"
-          rows={2}
-        />
-        {streaming
-          ? <button className="btn btn-stop" onClick={stop}>중단</button>
-          : <button className="btn" onClick={send} disabled={!draft.trim()}>전송</button>}
+        {attachments.length > 0 && (
+          <div className="composer-attachments">
+            {attachments.map((a, i) => (
+              <div key={i} className="attachment-chip" title={`${a.name ?? '이미지'} · ${Math.round(a.size / 1024)}KB`}>
+                <img src={a.dataUrl} alt="" className="attachment-thumb" />
+                <button className="attachment-x" onClick={() => removeAttachment(i)}>✕</button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="composer-row">
+          <textarea
+            value={draft}
+            onChange={(e) => { setDraft(e.target.value); setMenuDismissed(false); }}
+            onKeyDown={onKeyDown}
+            placeholder="메시지… (Enter 전송, Shift+Enter 줄바꿈, / 스킬, 이미지 paste/drop/📎)"
+            rows={2}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              for (const f of Array.from(e.target.files ?? [])) addImageFile(f);
+              e.target.value = '';
+            }}
+          />
+          <button
+            className="btn btn-ghost composer-attach"
+            onClick={() => fileInputRef.current?.click()}
+            title="이미지 첨부"
+          >
+            📎
+          </button>
+          {streaming
+            ? <button className="btn btn-stop" onClick={stop}>중단</button>
+            : <button className="btn" onClick={send}
+                disabled={!draft.trim() && attachments.length === 0}>전송</button>}
+        </div>
       </div>
     </div>
   );

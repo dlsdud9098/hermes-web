@@ -49,6 +49,8 @@ export interface StreamRunOptions {
   projectPath?: string;
   /** 이번 턴의 새 user 메시지 */
   message: string;
+  /** 첨부 이미지 (base64 data URL) — 멀티모달 모델일 때만 의미 있음 */
+  images?: { dataUrl: string; mime: string }[];
   baseUrl?: string;
   apiKey?: string;
   signal?: AbortSignal;
@@ -115,10 +117,21 @@ export async function* streamRun(opts: StreamRunOptions): AsyncGenerator<RunEven
   const base = opts.baseUrl ?? DEFAULT_BASE;
   const key = opts.apiKey ?? DEFAULT_KEY;
 
-  let content = `${opts.message}\n\n${PROJECT_MARKER}${opts.projectId}`;
+  let text = `${opts.message}\n\n${PROJECT_MARKER}${opts.projectId}`;
   if (opts.projectPath && opts.projectPath.trim()) {
-    content += `\n${CWD_MARKER}${opts.projectPath.trim()}`;
+    text += `\n${CWD_MARKER}${opts.projectPath.trim()}`;
   }
+
+  // 이미지가 있으면 OpenAI 식 content 배열로 전송, 없으면 기존처럼 string
+  const input: unknown = opts.images && opts.images.length > 0
+    ? [
+        { type: 'input_text', text },
+        ...opts.images.map((img) => ({
+          type: 'input_image',
+          image_url: img.dataUrl,
+        })),
+      ]
+    : text;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -130,7 +143,7 @@ export async function* streamRun(opts: StreamRunOptions): AsyncGenerator<RunEven
   const createRes = await httpFetch(`${base}/runs`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ input: content }),
+    body: JSON.stringify({ input }),
     signal: opts.signal,
   });
   if (!createRes.ok) {

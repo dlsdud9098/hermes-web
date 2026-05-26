@@ -1123,3 +1123,70 @@
 
 .statusbar-clickable { cursor: pointer; }
 .statusbar-clickable:hover { color: var(--accent); }
+
+/* ── 이미지 첨부 / 이미지 메시지 ───────────── */
+.composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px 0;
+}
+.attachment-chip {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg-bar);
+}
+.attachment-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+.attachment-x {
+  position: absolute;
+  top: 2px; right: 2px;
+  width: 16px; height: 16px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 9px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.attachment-x:hover { background: rgba(0, 0, 0, 0.8); }
+
+.composer-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.composer-row textarea { flex: 1; }
+.composer-attach {
+  padding: 4px 8px !important;
+  font-size: 14px;
+}
+
+/* 사용자 메시지 내 이미지 */
+.msg-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.msg-image {
+  max-width: 240px;
+  max-height: 240px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  cursor: zoom-in;
+}
+/* 마크다운 안 이미지 (assistant 응답) */
+.markdown .md-image {
+  max-width: 100%;
+  max-height: 400px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  cursor: zoom-in;
+  margin: 6px 0;
+}
