@@ -1345,3 +1345,11 @@
   padding: 20px;
   line-height: 1.6;
 }
+
+/* 임베드 브라우저 — 자식 webview 가 이 슬롯 위에 오버레이 */
+.browser-slot {
+  flex: 1;
+  position: relative;
+  background: #fff;
+  min-height: 0;
+}

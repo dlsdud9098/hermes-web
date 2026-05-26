@@ -3,6 +3,7 @@
 // 같은 시맨틱. 프론트엔드는 Tauri 환경에서만 invoke 로 호출.
 // Hermes 게이트웨이(HTTP/SSE) 는 별도 tauri-plugin-http 로 직접 호출 (CORS 우회).
 
+mod browser;
 mod claude_cli;
 mod codex_cli;
 mod fs_walk;
@@ -315,6 +316,7 @@ pub fn run() {
         .manage(codex_cli::CodexSessions::default())
         .manage(sessions::SessionIndex::default())
         .manage(usage::UsageCache::default())
+        .manage(browser::BrowserRegistry::default())
         .setup(|app| {
             // 세션 인덱스 백그라운드 워밍업 — Everything 식 캐시
             sessions::start_indexer(app.handle().clone());
@@ -343,6 +345,12 @@ pub fn run() {
             codex_cli::codex_login_status,
             usage::claude_usage,
             usage::codex_usage,
+            browser::browser_create,
+            browser::browser_navigate,
+            browser::browser_set_bounds,
+            browser::browser_set_visible,
+            browser::browser_close,
+            browser::browser_eval,
         ])
         .on_window_event(|window, event| {
             // 창 닫히면 모든 Claude PTY 세션 일괄 정리 — 좀비 프로세스 방지

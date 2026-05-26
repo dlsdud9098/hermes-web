@@ -78,7 +78,7 @@ const components = {
     <CodexPanel panelId={props.api.id} projectId={props.params.projectId} />
   ),
   browser: (props: IDockviewPanelProps<{ url?: string }>) => (
-    <BrowserPanel initialUrl={props.params.url ?? ''} />
+    <BrowserPanel panelId={props.api.id} initialUrl={props.params.url ?? ''} />
   ),
 };
 

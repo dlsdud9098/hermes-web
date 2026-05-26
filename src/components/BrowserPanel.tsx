@@ -1,57 +1,117 @@
-// 인앱 브라우저 패널 — iframe 기반.
-// 한계: X-Frame-Options / Content-Security-Policy 로 차단된 사이트는 안 보임
-//   (google.com 등). localhost / 개발 서버 / 자체 도메인은 잘 됨.
-// 향후 Tauri 자식 webview 로 교체하면 우회 가능 (작업량 큼).
+// 인앱 브라우저 패널 — Tauri 자식 webview 임베드.
+// 패널 div bbox 를 측정해 Rust 에 전달, webview 가 그 위치/크기로 떠 있음.
+// 진짜 Chromium/WebKit 이라 X-Frame-Options 제약 없음. 로그인/JS 모두 동작.
+//
+// 브라우저 환경(Tauri 아님) 에서는 invoke 가 no-op → 빈 패널.
 
 import { useEffect, useRef, useState } from 'react';
+import {
+  browserCreate, browserNavigate, browserSetBounds, browserSetVisible, browserClose,
+} from '../api/browser';
+import { isTauri } from '../runtime';
 
 interface Props {
+  panelId: string;
   initialUrl?: string;
 }
 
-function normalizeUrl(u: string): string {
+function normalizeForDraft(u: string): string {
   const t = u.trim();
   if (!t) return '';
-  if (/^https?:\/\//i.test(t)) return t;
-  if (/^localhost(:\d+)?(\/|$)/.test(t)) return `http://${t}`;
-  if (/^\d+\.\d+\.\d+\.\d+/.test(t)) return `http://${t}`;
-  // 도메인처럼 보이면 https
+  if (/^[a-z]+:\/\//i.test(t)) return t;
+  if (/^localhost/i.test(t)) return `http://${t}`;
   if (/\.[a-z]{2,}/i.test(t)) return `https://${t}`;
-  // 그 외 — 검색 (DuckDuckGo)
-  return `https://duckduckgo.com/?q=${encodeURIComponent(t)}`;
+  return t;
 }
 
-export function BrowserPanel({ initialUrl = '' }: Props) {
+export function BrowserPanel({ panelId, initialUrl = '' }: Props) {
   const [draft, setDraft] = useState(initialUrl);
   const [url, setUrl] = useState(initialUrl);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const slotRef = useRef<HTMLDivElement>(null);
+  const visibleRef = useRef(true);
 
-  useEffect(() => { setDraft(url); }, [url]);
+  // bbox 측정 — div 의 윈도우 기준 좌표 (CSS px)
+  const measure = () => {
+    const el = slotRef.current;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.left, y: r.top, w: r.width, h: r.height };
+  };
+
+  // 마운트 — 자식 webview 생성. bbox 측정 후 호출.
+  useEffect(() => {
+    if (!isTauri) return;
+    const b = measure() ?? { x: 0, y: 0, w: 100, h: 100 };
+    void browserCreate(panelId, url || 'about:blank', b);
+    return () => { void browserClose(panelId); };
+  }, [panelId]); // url 은 별도 effect 로 navigate
+
+  // URL 변경 — navigate
+  useEffect(() => {
+    if (!isTauri || !url) return;
+    void browserNavigate(panelId, url);
+  }, [url, panelId]);
+
+  // 크기/위치 변화 — ResizeObserver + scroll/window resize 동시 감시
+  useEffect(() => {
+    if (!isTauri) return;
+    let raf: number | null = null;
+    const sync = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = null;
+        if (!visibleRef.current) return;
+        const b = measure();
+        if (b) void browserSetBounds(panelId, b);
+      });
+    };
+    const el = slotRef.current;
+    const ro = el ? new ResizeObserver(sync) : null;
+    if (el && ro) ro.observe(el);
+    window.addEventListener('resize', sync);
+    window.addEventListener('scroll', sync, true);
+    // dockview 패널 드래그/리사이즈 — 빈번 — 100ms 폴링 백업
+    const handle = window.setInterval(sync, 200);
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener('resize', sync);
+      window.removeEventListener('scroll', sync, true);
+      window.clearInterval(handle);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [panelId]);
+
+  // 패널이 화면에서 사라질 때 webview 숨김 (탭 전환/dockview 그룹 비활성)
+  useEffect(() => {
+    if (!isTauri) return;
+    const el = slotRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => {
+      const isIntersecting = entries[0]?.isIntersecting ?? true;
+      visibleRef.current = isIntersecting;
+      void browserSetVisible(panelId, isIntersecting);
+    }, { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [panelId]);
 
   function navigate(to: string) {
-    const u = normalizeUrl(to);
+    const u = normalizeForDraft(to);
     if (u) setUrl(u);
-  }
-
-  function reload() {
-    setRefreshKey((k) => k + 1);
-  }
-
-  function back() {
-    // iframe contentWindow.history.back — 같은 origin 제약
-    try { iframeRef.current?.contentWindow?.history.back(); } catch { /* cross-origin */ }
-  }
-  function forward() {
-    try { iframeRef.current?.contentWindow?.history.forward(); } catch { /* cross-origin */ }
   }
 
   return (
     <div className="browser">
       <div className="browser-bar">
-        <button className="btn btn-ghost browser-nav" onClick={back} title="뒤로">◀</button>
-        <button className="btn btn-ghost browser-nav" onClick={forward} title="앞으로">▶</button>
-        <button className="btn btn-ghost browser-nav" onClick={reload} title="새로고침">⟳</button>
+        <button className="btn btn-ghost browser-nav"
+          onClick={() => void browserNavigate(panelId, 'javascript:history.back()')}
+          title="뒤로">◀</button>
+        <button className="btn btn-ghost browser-nav"
+          onClick={() => void browserNavigate(panelId, 'javascript:history.forward()')}
+          title="앞으로">▶</button>
+        <button className="btn btn-ghost browser-nav"
+          onClick={() => url && void browserNavigate(panelId, url)}
+          title="새로고침">⟳</button>
         <input
           className="browser-url"
           value={draft}
@@ -59,28 +119,19 @@ export function BrowserPanel({ initialUrl = '' }: Props) {
           onKeyDown={(e) => {
             if (e.key === 'Enter') { e.preventDefault(); navigate(draft); }
           }}
-          placeholder="URL 또는 검색어 입력 (Enter)"
+          placeholder="URL 입력 후 Enter"
           spellCheck={false}
         />
         <button className="btn" onClick={() => navigate(draft)}>이동</button>
       </div>
-      {url ? (
-        <iframe
-          key={refreshKey}
-          ref={iframeRef}
-          className="browser-frame"
-          src={url}
-          // sandbox — 보안. allow-same-origin 빼면 쿠키/스토리지 격리.
-          // 일단 풀 — localhost 대상이라면 same-origin 필요.
-          sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-modals allow-downloads"
-          referrerPolicy="no-referrer-when-downgrade"
-        />
-      ) : (
-        <div className="browser-empty">
-          URL 입력하고 Enter. localhost / 개발 서버 등은 잘 보임.<br />
-          외부 사이트(google.com 등)는 X-Frame-Options 로 차단될 수 있음 — 그땐 시스템 브라우저로.
-        </div>
-      )}
+      {/* 자식 webview 가 이 영역 위에 오버레이됨 — 빈 배경만 유지 */}
+      <div ref={slotRef} className="browser-slot">
+        {!isTauri && (
+          <div className="browser-empty">
+            임베드 브라우저는 Tauri 데스크톱 모드에서만 동작 (브라우저 dev 모드 아님)
+          </div>
+        )}
+      </div>
     </div>
   );
 }
