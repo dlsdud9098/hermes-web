@@ -158,15 +158,17 @@ function buildMenu(opts: {
     }
   }
 
-  function copyPath() {
-    if (!entry) return;
-    void navigator.clipboard?.writeText(entry.path);
-  }
-
   const items: MenuItem[] = [];
   if (entry) {
     items.push(
-      { label: '복사', run: () => setClipboard({ paths: [entry.path], op: 'copy' }) },
+      {
+        label: '복사',
+        run: () => {
+          setClipboard({ paths: [entry.path], op: 'copy' });
+          // 트리 내부 붙여넣기 + 시스템 클립보드 둘 다 — 외부 앱에도 바로 paste 가능
+          void navigator.clipboard?.writeText(entry.path);
+        },
+      },
       { label: '잘라내기', run: () => setClipboard({ paths: [entry.path], op: 'cut' }) },
     );
   }
@@ -179,7 +181,6 @@ function buildMenu(opts: {
   if (entry) {
     items.push({ label: '', sep: true, run: () => {} });
     items.push({ label: '이름 변경', run: rename });
-    items.push({ label: '경로 복사', run: copyPath });
     items.push({ label: '삭제', run: remove });
   }
   items.push({ label: '', sep: true, run: () => {} });
