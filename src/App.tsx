@@ -113,8 +113,10 @@ function Shell() {
 
   const shortcuts = useMemo(() => ({
     newSessionTab: () => addSession('tab'),
-    newSessionSplitH: () => addSession('right'),
-    newSessionSplitV: () => addSession('below'),
+    // 가로 분할 = 가로선 = 위아래 배치
+    newSessionSplitH: () => addSession('below'),
+    // 세로 분할 = 세로선 = 좌우 배치
+    newSessionSplitV: () => addSession('right'),
     closeActivePanel,
     openSettings: () => setSettingsOpen(true),
     openFolder: openFolderPicker,

@@ -42,9 +42,9 @@ export interface ActionSpec {
 
 /** 사용자에게 노출하는 액션 목록. 표시 순서 = 정의 순서 */
 export const ACTIONS: readonly ActionSpec[] = [
-  { id: 'newSessionTab',     label: '새 세션 탭',           allowEditing: false },
-  { id: 'newSessionSplitH',  label: '새 세션 가로 분할(↔)', allowEditing: false },
-  { id: 'newSessionSplitV',  label: '새 세션 세로 분할(↕)', allowEditing: false },
+  { id: 'newSessionTab',     label: '새 세션 탭',                    allowEditing: false },
+  { id: 'newSessionSplitH',  label: '새 세션 가로 분할(─, 위아래)',  allowEditing: false },
+  { id: 'newSessionSplitV',  label: '새 세션 세로 분할(│, 좌우)',    allowEditing: false },
   { id: 'closeActivePanel', label: '활성 패널 닫기',     allowEditing: false },
   { id: 'previewActive',    label: '활성 HTML 프리뷰',   allowEditing: false },
   { id: 'openSearch',       label: '프로젝트 전체 검색', allowEditing: true  },

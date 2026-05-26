@@ -122,13 +122,13 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
             title="활성 그룹에 새 탭">
             + 탭
           </button>
-          <button className="btn btn-ghost" onClick={() => addSession('right')}
-            title="오른쪽으로 가로 분할">
-            ↔ 분할
-          </button>
           <button className="btn btn-ghost" onClick={() => addSession('below')}
-            title="아래쪽으로 세로 분할">
-            ↕ 분할
+            title="가로선으로 분할 — 위아래 배치">
+            ─ 가로 분할
+          </button>
+          <button className="btn btn-ghost" onClick={() => addSession('right')}
+            title="세로선으로 분할 — 좌우 배치">
+            │ 세로 분할
           </button>
         </div>
       </div>
