@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { FONT_OPTIONS, WEIGHT_OPTIONS } from '../settings';
+import { FONT_OPTIONS, THEME_PRESETS, WEIGHT_OPTIONS, getPreset } from '../settings';
 import { useSettings } from '../store/settings';
 import {
   ACTIONS, DEFAULT_KEYMAP, keyEventToCombo,
@@ -120,11 +120,19 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           <div className="settings-pane">
             {tab === 'appearance' && (
               <>
-                <Row label="테마">
-                  <select value={settings.theme}
-                    onChange={(e) => update({ theme: e.target.value as 'light' | 'dark' })}>
-                    <option value="light">라이트</option>
-                    <option value="dark">다크</option>
+                <Row label="테마 프리셋">
+                  <select value={settings.themePreset}
+                    onChange={(e) => {
+                      const preset = getPreset(e.target.value);
+                      update({
+                        themePreset: preset.id,
+                        theme: preset.mode,
+                        accentColor: preset.vars.accent,
+                      });
+                    }}>
+                    {THEME_PRESETS.map((p) => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                    ))}
                   </select>
                 </Row>
                 <Row label="폰트">
