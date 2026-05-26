@@ -3,6 +3,9 @@
 // 같은 시맨틱. 프론트엔드는 Tauri 환경에서만 invoke 로 호출.
 // Hermes 게이트웨이(HTTP/SSE) 는 별도 tauri-plugin-http 로 직접 호출 (CORS 우회).
 
+mod search;
+mod sessions;
+
 use serde::Serialize;
 use std::fs;
 use std::io::{Read, Seek, SeekFrom};
@@ -201,6 +204,9 @@ pub fn run() {
             fs_read,
             fs_write,
             fs_skills,
+            sessions::sessions_list,
+            sessions::session_load,
+            search::search_in_dir,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 앱 실행 실패");

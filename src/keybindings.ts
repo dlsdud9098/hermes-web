@@ -11,6 +11,8 @@ export interface Shortcuts {
   openFolder: () => void;
   toggleFileTree: () => void;
   previewActive: () => void;
+  openSearch: () => void;
+  openSessions: () => void;
   /** index = 1..9 → 해당 프로젝트로 전환 */
   switchProject: (index: number) => void;
 }
@@ -44,6 +46,14 @@ export function useGlobalShortcuts(s: Shortcuts): void {
       // Ctrl+O → 폴더 열기
       if (e.key.toLowerCase() === 'o' && !e.shiftKey) {
         e.preventDefault(); s.openFolder(); return;
+      }
+      // Ctrl+Shift+F → 프로젝트 전체 검색
+      if (e.key.toLowerCase() === 'f' && e.shiftKey) {
+        e.preventDefault(); s.openSearch(); return;
+      }
+      // Ctrl+Shift+H → 세션 기록 브라우저
+      if (e.key.toLowerCase() === 'h' && e.shiftKey) {
+        e.preventDefault(); s.openSessions(); return;
       }
 
       if (editing) return;

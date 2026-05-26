@@ -6,6 +6,7 @@ import { ProjectRail } from './components/ProjectRail';
 import { Workspace } from './components/Workspace';
 import { FolderPicker } from './components/FolderPicker';
 import { SettingsModal } from './components/SettingsModal';
+import { SessionBrowser } from './components/SessionBrowser';
 import { useGlobalShortcuts } from './keybindings';
 import './App.css';
 
@@ -14,6 +15,7 @@ function Shell() {
   const active = projects.find((p) => p.id === activeId) ?? projects[0];
   const [pickerOpen, setPickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sessionsOpen, setSessionsOpen] = useState(false);
   const [treeOpen, setTreeOpen] = useState(true);
   // 활성 Workspace 의 dockview api — 레일 파일 트리에서 뷰어 패널을 열 때 + 단축키
   const dockApiRef = useRef<DockviewApi | null>(null);
@@ -37,6 +39,42 @@ function Shell() {
     window.addEventListener('hermes:open-preview', onOpenPreview);
     return () => window.removeEventListener('hermes:open-preview', onOpenPreview);
   }, []);
+
+  // SearchPanel 의 결과 클릭 → FileViewer 패널 열기 (line 은 후속 기능)
+  useEffect(() => {
+    function onOpenFile(e: Event) {
+      const ce = e as CustomEvent<{ filePath: string; line?: number }>;
+      const api = dockApiRef.current;
+      if (!api) return;
+      const filePath = ce.detail.filePath;
+      const name = filePath.split(/[/\\]/).pop() ?? 'file';
+      api.addPanel({
+        id: uid('panel'),
+        component: 'fileviewer',
+        title: name,
+        params: { filePath },
+      });
+    }
+    window.addEventListener('hermes:open-file', onOpenFile);
+    return () => window.removeEventListener('hermes:open-file', onOpenFile);
+  }, []);
+
+  const openSearchPanel = useCallback(() => {
+    const api = dockApiRef.current;
+    if (!api || !active) return;
+    // 이미 같은 프로젝트 검색 패널이 있으면 활성화만
+    const existing = api.panels.find((p) => p.view.contentComponent === 'search');
+    if (existing) {
+      existing.api.setActive();
+      return;
+    }
+    api.addPanel({
+      id: uid('panel'),
+      component: 'search',
+      title: `🔎 ${active.name} 검색`,
+      params: { projectPath: active.path },
+    });
+  }, [active]);
 
   const openFolderPicker = useCallback(() => setPickerOpen(true), []);
 
@@ -89,12 +127,14 @@ function Shell() {
     openFolder: openFolderPicker,
     toggleFileTree: () => setTreeOpen((o) => !o),
     previewActive,
+    openSearch: openSearchPanel,
+    openSessions: () => setSessionsOpen(true),
     switchProject: (i: number) => {
       const p = projects[i - 1];
       if (p) setActive(p.id);
     },
   }), [newSessionTab, newSessionSplit, closeActivePanel, openFolderPicker,
-       previewActive, projects, setActive]);
+       previewActive, openSearchPanel, projects, setActive]);
 
   useGlobalShortcuts(shortcuts);
 
@@ -105,6 +145,7 @@ function Shell() {
         setTreeOpen={setTreeOpen}
         onOpenFolder={() => setPickerOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSessions={() => setSessionsOpen(true)}
         onOpenFile={(file) => {
           dockApiRef.current?.addPanel({
             id: uid('panel'),
@@ -135,6 +176,22 @@ function Shell() {
         />
       )}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {sessionsOpen && (
+        <SessionBrowser
+          onClose={() => setSessionsOpen(false)}
+          onOpen={(s) => {
+            const api = dockApiRef.current;
+            if (!api) return;
+            const name = s.title.length > 32 ? s.title.slice(0, 32) + '…' : s.title;
+            api.addPanel({
+              id: uid('panel'),
+              component: 'sessionviewer',
+              title: `📜 ${name}`,
+              params: { source: s.source, file: s.file },
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

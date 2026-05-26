@@ -9,12 +9,13 @@ interface ProjectRailProps {
   onOpenFolder: () => void;
   onOpenFile: (file: DirEntry) => void;
   onOpenSettings: () => void;
+  onOpenSessions: () => void;
   treeOpen: boolean;
   setTreeOpen: (next: boolean | ((prev: boolean) => boolean)) => void;
 }
 
 export function ProjectRail({
-  onOpenFolder, onOpenFile, onOpenSettings, treeOpen, setTreeOpen,
+  onOpenFolder, onOpenFile, onOpenSettings, onOpenSessions, treeOpen, setTreeOpen,
 }: ProjectRailProps) {
   const { projects, activeId, setActive, removeProject } = useProjects();
 
@@ -53,6 +54,9 @@ export function ProjectRail({
           +
         </button>
       </div>
+      <button className="rail-settings" onClick={onOpenSessions} title="세션 기록 (Claude/Codex)">
+        📜
+      </button>
       <button className="rail-settings" onClick={onOpenSettings} title="설정">
         ⚙
       </button>

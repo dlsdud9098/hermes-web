@@ -13,12 +13,23 @@ import { ChatPanel } from './ChatPanel';
 import { PanelTab } from './PanelTab';
 import { FileViewerPanel } from './FileViewer';
 import { HtmlPreviewPanel } from './HtmlPreview';
+import { SessionViewerPanel } from './SessionViewer';
+import { SearchPanel } from './SearchPanel';
 import { useProjects, uid } from '../store/projects';
 import { useSettings } from '../store/settings';
 import type { Project } from '../types';
 
 interface ChatParams { projectId: string }
 interface ViewerParams { filePath: string }
+interface SessionViewerParams { source: 'claude' | 'codex'; file: string }
+interface SearchParams { projectPath: string }
+
+/** SearchPanel 안에서 dockview 컨테이너를 알 수 없으므로 글로벌 이벤트로 파일 열기 */
+function emitOpenFile(filePath: string, line: number) {
+  window.dispatchEvent(new CustomEvent('hermes:open-file', {
+    detail: { filePath, line },
+  }));
+}
 
 const components = {
   chat: (props: IDockviewPanelProps<ChatParams>) => (
@@ -29,6 +40,12 @@ const components = {
   ),
   htmlpreview: (props: IDockviewPanelProps<ViewerParams>) => (
     <HtmlPreviewPanel filePath={props.params.filePath} />
+  ),
+  sessionviewer: (props: IDockviewPanelProps<SessionViewerParams>) => (
+    <SessionViewerPanel source={props.params.source} file={props.params.file} />
+  ),
+  search: (props: IDockviewPanelProps<SearchParams>) => (
+    <SearchPanel projectPath={props.params.projectPath} onOpenFile={emitOpenFile} />
   ),
 };
 
