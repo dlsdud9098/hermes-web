@@ -4,12 +4,17 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { FONT_OPTIONS, WEIGHT_OPTIONS } from '../settings';
 import { useSettings } from '../store/settings';
+import {
+  ACTIONS, DEFAULT_KEYMAP, keyEventToCombo,
+  type ShortcutAction,
+} from '../keybindings';
 
 const TABS = [
   { id: 'appearance', label: '외형' },
   { id: 'chat', label: '채팅' },
   { id: 'editor', label: '에디터' },
   { id: 'files', label: '파일' },
+  { id: 'keys', label: '단축키' },
 ];
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -21,9 +26,77 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+/** 단축키 한 행 — 빈 버튼 클릭 → 다음 키 입력 캡쳐 후 저장 */
+function KeymapRow({
+  action, label, current, onChange, onReset, conflict,
+}: {
+  action: ShortcutAction;
+  label: string;
+  current: string;
+  onChange: (combo: string) => void;
+  onReset: () => void;
+  conflict: boolean;
+}) {
+  const [recording, setRecording] = useState(false);
+
+  function startRecord() {
+    setRecording(true);
+    const onKey = (e: KeyboardEvent) => {
+      // Esc 만 누르면 취소
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        window.removeEventListener('keydown', onKey, true);
+        setRecording(false);
+        return;
+      }
+      const combo = keyEventToCombo(e);
+      if (!combo) return; // modifier-only
+      e.preventDefault();
+      e.stopPropagation();
+      window.removeEventListener('keydown', onKey, true);
+      onChange(combo);
+      setRecording(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+  }
+
+  return (
+    <div className="keymap-row">
+      <span className="keymap-label">{label}</span>
+      <button
+        className={`keymap-key${recording ? ' keymap-key-rec' : ''}${conflict ? ' keymap-key-conflict' : ''}`}
+        onClick={startRecord}
+        title={conflict ? '다른 액션과 충돌' : '클릭 후 단축키 입력 (Esc 취소)'}
+      >
+        {recording ? '키 입력…' : current}
+      </button>
+      {current !== DEFAULT_KEYMAP[action] && (
+        <button className="btn btn-ghost keymap-reset" onClick={onReset} title="기본값으로">
+          ↺
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function SettingsModal({ onClose }: { onClose: () => void }) {
   const { settings, update } = useSettings();
   const [tab, setTab] = useState('appearance');
+
+  // 같은 콤보를 쓰는 액션이 2개 이상이면 양쪽 빨갛게
+  const conflicts = new Set<ShortcutAction>();
+  {
+    const seen = new Map<string, ShortcutAction>();
+    for (const [id, combo] of Object.entries(settings.keymap) as [ShortcutAction, string][]) {
+      const prev = seen.get(combo);
+      if (prev) {
+        conflicts.add(prev);
+        conflicts.add(id);
+      } else {
+        seen.set(combo, id);
+      }
+    }
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -100,6 +173,13 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
 
             {tab === 'chat' && (
               <>
+                <Row label="채팅 백엔드">
+                  <select value={settings.chatProvider}
+                    onChange={(e) => update({ chatProvider: e.target.value as 'hermes' | 'claude' })}>
+                    <option value="hermes">Hermes Agent</option>
+                    <option value="claude">Claude Code (Max 구독)</option>
+                  </select>
+                </Row>
                 <Row label="Enter 동작">
                   <select value={settings.enterToSend ? 'send' : 'newline'}
                     onChange={(e) => update({ enterToSend: e.target.value === 'send' })}>
@@ -164,6 +244,36 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
                   </select>
                 </Row>
               </>
+            )}
+
+            {tab === 'keys' && (
+              <div className="keymap-list">
+                <div className="keymap-hint">
+                  키를 누르면 등록됨. Esc 로 취소. Ctrl+1~9(프로젝트 전환)는 고정.
+                </div>
+                {ACTIONS.map((a) => (
+                  <KeymapRow
+                    key={a.id}
+                    action={a.id}
+                    label={a.label}
+                    current={settings.keymap[a.id]}
+                    conflict={conflicts.has(a.id)}
+                    onChange={(combo) => update({
+                      keymap: { ...settings.keymap, [a.id]: combo },
+                    })}
+                    onReset={() => update({
+                      keymap: { ...settings.keymap, [a.id]: DEFAULT_KEYMAP[a.id] },
+                    })}
+                  />
+                ))}
+                <button
+                  className="btn btn-ghost"
+                  style={{ marginTop: 12 }}
+                  onClick={() => update({ keymap: { ...DEFAULT_KEYMAP } })}
+                >
+                  전체 기본값으로
+                </button>
+              </div>
             )}
           </div>
         </div>

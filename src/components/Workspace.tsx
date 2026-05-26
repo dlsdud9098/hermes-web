@@ -96,23 +96,21 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
   }, [project.id, project.layout, saveLayout, seed, onApiReady]);
 
   // mode 'tab' → 활성 그룹에 탭으로 추가 / 'split' → 오른쪽으로 세로 분할
-  const addSession = useCallback((
-    mode: 'tab' | 'split',
-    backend: 'chat' | 'claudecode' = 'chat',
-  ) => {
+  // 백엔드는 설정의 chatProvider 가 결정 — 여기서는 그것만 따른다
+  const addSession = useCallback((mode: 'tab' | 'split') => {
     const api = apiRef.current;
     if (!api) return;
-    const prefix = backend === 'claudecode' ? 'Claude' : '세션';
+    const isClaude = settings.chatProvider === 'claude';
     api.addPanel({
       id: uid('panel'),
-      component: backend,
-      title: `${prefix} ${counterRef.current++}`,
+      component: isClaude ? 'claudecode' : 'chat',
+      title: `${isClaude ? 'Claude' : '세션'} ${counterRef.current++}`,
       params: { projectId: project.id },
       ...(mode === 'split'
         ? { position: { direction: 'right' as const } }
         : {}),
     });
-  }, [project.id]);
+  }, [project.id, settings.chatProvider]);
 
   return (
     <div className="workspace">
@@ -122,11 +120,7 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
         </span>
         <div className="workspace-actions">
           <button className="btn btn-ghost" onClick={() => addSession('tab')}>
-            + Hermes
-          </button>
-          <button className="btn btn-ghost" onClick={() => addSession('tab', 'claudecode')}
-            title="Claude Code 인터랙티브 세션 (Max 구독)">
-            + Claude
+            + 탭
           </button>
           <button className="btn btn-ghost" onClick={() => addSession('split')}>
             + 분할

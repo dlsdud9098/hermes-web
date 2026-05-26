@@ -8,10 +8,12 @@ import { FolderPicker } from './components/FolderPicker';
 import { SettingsModal } from './components/SettingsModal';
 import { SessionBrowser } from './components/SessionBrowser';
 import { useGlobalShortcuts } from './keybindings';
+import { useSettings } from './store/settings';
 import './App.css';
 
 function Shell() {
   const { projects, activeId, openProject, setActive } = useProjects();
+  const { settings } = useSettings();
   const active = projects.find((p) => p.id === activeId) ?? projects[0];
   const [pickerOpen, setPickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -81,25 +83,27 @@ function Shell() {
   const newSessionTab = useCallback(() => {
     const api = dockApiRef.current;
     if (!api || !active) return;
+    const isClaude = settings.chatProvider === 'claude';
     api.addPanel({
       id: uid('panel'),
-      component: 'chat',
-      title: `세션 ${api.panels.length + 1}`,
+      component: isClaude ? 'claudecode' : 'chat',
+      title: `${isClaude ? 'Claude' : '세션'} ${api.panels.length + 1}`,
       params: { projectId: active.id },
     });
-  }, [active]);
+  }, [active, settings.chatProvider]);
 
   const newSessionSplit = useCallback(() => {
     const api = dockApiRef.current;
     if (!api || !active) return;
+    const isClaude = settings.chatProvider === 'claude';
     api.addPanel({
       id: uid('panel'),
-      component: 'chat',
-      title: `세션 ${api.panels.length + 1}`,
+      component: isClaude ? 'claudecode' : 'chat',
+      title: `${isClaude ? 'Claude' : '세션'} ${api.panels.length + 1}`,
       params: { projectId: active.id },
       position: { direction: 'right' as const },
     });
-  }, [active]);
+  }, [active, settings.chatProvider]);
 
   const closeActivePanel = useCallback(() => {
     const api = dockApiRef.current;
@@ -136,7 +140,7 @@ function Shell() {
   }), [newSessionTab, newSessionSplit, closeActivePanel, openFolderPicker,
        previewActive, openSearchPanel, projects, setActive]);
 
-  useGlobalShortcuts(shortcuts);
+  useGlobalShortcuts(shortcuts, settings.keymap);
 
   return (
     <div className="app">
