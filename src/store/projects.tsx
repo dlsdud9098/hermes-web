@@ -4,7 +4,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { ChatMessage, Project } from '../types';
+import type { ChatMessage, Project, ProjectTab } from '../types';
 
 const COLORS = ['#7aa2f7', '#bb9af7', '#9ece6a', '#e0af68', '#f7768e', '#7dcfff'];
 const STORAGE_KEY = 'hermes-web:state:v1';
@@ -26,7 +26,16 @@ interface ProjectsContextValue {
   openProject: (path: string) => void;
   removeProject: (id: string) => void;
   setActive: (id: string) => void;
-  saveLayout: (projectId: string, layout: unknown) => void;
+  /** 현재 활성 탭의 dockview 레이아웃 영속화 */
+  saveLayout: (projectId: string, tabId: string, layout: unknown) => void;
+  /** 프로젝트에 새 탭 추가하고 활성화 */
+  addTab: (projectId: string) => string;
+  /** 탭 닫기 — 마지막 탭이면 새 빈 탭으로 대체 */
+  closeTab: (projectId: string, tabId: string) => void;
+  /** 탭 활성화 */
+  setActiveTab: (projectId: string, tabId: string) => void;
+  /** 탭 이름 변경 */
+  renameTab: (projectId: string, tabId: string, name: string) => void;
   setMessages: (panelId: string, messages: ChatMessage[]) => void;
 }
 
@@ -38,14 +47,31 @@ interface PersistedState {
 
 const ProjectsContext = createContext<ProjectsContextValue | null>(null);
 
+function makeTab(name: string = '탭 1'): ProjectTab {
+  return { id: uid('tab'), name, layout: null };
+}
+
 function makeProject(path: string): Project {
+  const tab = makeTab('탭 1');
   return {
     id: uid('proj'),
     name: basename(path),
     path,
     color: COLORS[seq % COLORS.length],
-    layout: null,
+    tabs: [tab],
+    activeTabId: tab.id,
   };
+}
+
+/** 옛 Project (layout 단일 필드) → 새 구조 (tabs[]) 마이그레이션 */
+function migrateProject(p: Project): Project {
+  if (Array.isArray(p.tabs) && p.tabs.length > 0 && p.activeTabId) return p;
+  const tab: ProjectTab = {
+    id: uid('tab'),
+    name: '탭 1',
+    layout: (p as { layout?: unknown }).layout ?? null,
+  };
+  return { ...p, tabs: [tab], activeTabId: tab.id };
 }
 
 /** localStorage 에서 상태 복원. 손상/없음이면 null */
@@ -55,7 +81,7 @@ function loadState(): PersistedState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PersistedState>;
     if (!Array.isArray(parsed.projects)) return null;
-    const projects = parsed.projects;
+    const projects = parsed.projects.map(migrateProject);
     const activeId = projects.some((p) => p.id === parsed.activeId)
       ? (parsed.activeId as string)
       : (projects[0]?.id ?? '');
@@ -102,10 +128,54 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
 
   const setActive = useCallback((id: string) => setActiveId(id), []);
 
-  const saveLayout = useCallback((projectId: string, layout: unknown) => {
+  const saveLayout = useCallback((projectId: string, tabId: string, layout: unknown) => {
     setProjects((prev) =>
-      prev.map((p) => (p.id === projectId ? { ...p, layout } : p)),
+      prev.map((p) => p.id === projectId
+        ? { ...p, tabs: p.tabs.map((t) => t.id === tabId ? { ...t, layout } : t) }
+        : p,
+      ),
     );
+  }, []);
+
+  const addTab = useCallback((projectId: string): string => {
+    const tab = makeTab();
+    setProjects((prev) => prev.map((p) => {
+      if (p.id !== projectId) return p;
+      const nextTabs = [...p.tabs, tab];
+      const name = `탭 ${nextTabs.length}`;
+      return { ...p, tabs: nextTabs.map((t) => t.id === tab.id ? { ...t, name } : t), activeTabId: tab.id };
+    }));
+    return tab.id;
+  }, []);
+
+  const closeTab = useCallback((projectId: string, tabId: string) => {
+    setProjects((prev) => prev.map((p) => {
+      if (p.id !== projectId) return p;
+      const remaining = p.tabs.filter((t) => t.id !== tabId);
+      if (remaining.length === 0) {
+        // 마지막 탭이면 새 빈 탭으로 대체
+        const fresh = makeTab('탭 1');
+        return { ...p, tabs: [fresh], activeTabId: fresh.id };
+      }
+      const nextActive = p.activeTabId === tabId
+        ? remaining[Math.min(p.tabs.findIndex((t) => t.id === tabId), remaining.length - 1)].id
+        : p.activeTabId;
+      return { ...p, tabs: remaining, activeTabId: nextActive };
+    }));
+  }, []);
+
+  const setActiveTab = useCallback((projectId: string, tabId: string) => {
+    setProjects((prev) => prev.map((p) =>
+      p.id === projectId && p.tabs.some((t) => t.id === tabId)
+        ? { ...p, activeTabId: tabId } : p,
+    ));
+  }, []);
+
+  const renameTab = useCallback((projectId: string, tabId: string, name: string) => {
+    setProjects((prev) => prev.map((p) => p.id === projectId
+      ? { ...p, tabs: p.tabs.map((t) => t.id === tabId ? { ...t, name } : t) }
+      : p,
+    ));
   }, []);
 
   const setMessages = useCallback((panelId: string, msgs: ChatMessage[]) => {
@@ -115,9 +185,11 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ProjectsContextValue>(
     () => ({
       projects, activeId, messages,
-      openProject, removeProject, setActive, saveLayout, setMessages,
+      openProject, removeProject, setActive, saveLayout,
+      addTab, closeTab, setActiveTab, renameTab, setMessages,
     }),
-    [projects, activeId, messages, openProject, removeProject, setActive, saveLayout, setMessages],
+    [projects, activeId, messages, openProject, removeProject, setActive, saveLayout,
+     addTab, closeTab, setActiveTab, renameTab, setMessages],
   );
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;

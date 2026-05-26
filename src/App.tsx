@@ -12,7 +12,7 @@ import { useSettings } from './store/settings';
 import './App.css';
 
 function Shell() {
-  const { projects, activeId, openProject, setActive } = useProjects();
+  const { projects, activeId, openProject, setActive, addTab, closeTab } = useProjects();
   const { settings } = useSettings();
   const active = projects.find((p) => p.id === activeId) ?? projects[0];
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -80,53 +80,33 @@ function Shell() {
 
   const openFolderPicker = useCallback(() => setPickerOpen(true), []);
 
-  // 탭 모델 — 각 panel param 에 tabId. 같은 tabId = 같은 "탭"의 분할들.
-  // '+ 탭' → 새 tabId, 새 그룹. '+ 가로/세로 분할' → 현재 tabId 상속, 새 그룹(방향).
-  const addSession = useCallback((mode: 'tab' | 'right' | 'below') => {
+  // 탭 추가는 store 의 addTab — Workspace 가 탭 전환을 감지해 dockview remount
+  const newTab = useCallback(() => {
+    if (!active) return;
+    addTab(active.id);
+  }, [active, addTab]);
+
+  // 활성 패널 안에서 분할 (현재 탭의 dockview 에 panel 추가)
+  const splitPanel = useCallback((mode: 'right' | 'below') => {
     const api = dockApiRef.current;
     if (!api || !active) return;
     const isClaude = settings.chatProvider === 'claude';
-
-    const activePanel = api.activePanel;
-    const activeTabId = (activePanel?.params as { tabId?: string } | undefined)?.tabId;
-    const tabId = mode === 'tab' ? uid('tab') : (activeTabId ?? uid('tab'));
-
-    // '+ 탭' 은 새 그룹 — 빈 워크스페이스면 그냥 첫 패널로, 아니면 오른쪽 그룹
-    let position: { direction: 'right' | 'below' } | undefined;
-    if (mode === 'tab') {
-      position = api.panels.length > 0 ? { direction: 'right' } : undefined;
-    } else {
-      position = { direction: mode };
-    }
-
     api.addPanel({
       id: uid('panel'),
       component: isClaude ? 'claudecode' : 'chat',
       title: `${isClaude ? 'Claude' : '세션'} ${api.panels.length + 1}`,
-      params: { projectId: active.id, tabId },
-      ...(position ? { position } : {}),
+      params: { projectId: active.id },
+      position: { direction: mode },
     });
   }, [active, settings.chatProvider]);
 
-  // 탭 닫기 — 같은 tabId 가진 모든 패널 close (안의 분할 모두 제거)
+  // 활성 탭 통째로 닫기 — store 가 그 탭의 layout + 모든 panel 함께 제거
   const closeActiveTab = useCallback(() => {
-    const api = dockApiRef.current;
-    if (!api) return;
-    const activePanel = api.activePanel;
-    if (!activePanel) return;
-    const tabId = (activePanel.params as { tabId?: string } | undefined)?.tabId;
-    if (!tabId) {
-      // 레거시 패널(레이아웃 복원 등 tabId 없음) — 활성 패널만 close
-      activePanel.api.close();
-      return;
-    }
-    const targets = api.panels.filter(
-      (p) => (p.params as { tabId?: string } | undefined)?.tabId === tabId,
-    );
-    for (const p of targets) p.api.close();
-  }, []);
+    if (!active) return;
+    closeTab(active.id, active.activeTabId);
+  }, [active, closeTab]);
 
-  // 활성 패널만 close — 같은 탭의 다른 분할은 유지
+  // 활성 패널 1개만 close — 같은 탭의 다른 분할은 유지
   const closeActivePanel = useCallback(() => {
     dockApiRef.current?.activePanel?.api.close();
   }, []);
@@ -144,11 +124,11 @@ function Shell() {
   }, []);
 
   const shortcuts = useMemo(() => ({
-    newSessionTab: () => addSession('tab'),
+    newSessionTab: newTab,
     // 가로 분할 = 가로선 = 위아래 배치
-    newSessionSplitH: () => addSession('below'),
+    newSessionSplitH: () => splitPanel('below'),
     // 세로 분할 = 세로선 = 좌우 배치
-    newSessionSplitV: () => addSession('right'),
+    newSessionSplitV: () => splitPanel('right'),
     closeActiveTab,
     closeActivePanel,
     openSettings: () => setSettingsOpen(true),
@@ -161,7 +141,7 @@ function Shell() {
       const p = projects[i - 1];
       if (p) setActive(p.id);
     },
-  }), [addSession, closeActiveTab, closeActivePanel, openFolderPicker,
+  }), [newTab, splitPanel, closeActiveTab, closeActivePanel, openFolderPicker,
        previewActive, openSearchPanel, projects, setActive]);
 
   useGlobalShortcuts(shortcuts, settings.keymap);

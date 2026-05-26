@@ -1,5 +1,7 @@
-// 한 프로젝트의 작업 공간 — dockview 도킹 레이아웃. 패널 = Hermes 세션 / 파일 뷰어.
-// App 에서 project.id 를 key 로 주므로 프로젝트 전환 시 remount → 레이아웃 복원.
+// 한 프로젝트의 작업 공간 — cmux/tmux 모델.
+//   상단: 탭 바 — 각 탭이 독립된 dockview workspace (window).
+//   본문: 활성 탭의 dockview — 안에서 panel 들을 자유 분할 (pane).
+// 탭 닫기 = 그 탭의 모든 panel 사라짐.
 
 import { useCallback, useRef } from 'react';
 import {
@@ -16,6 +18,7 @@ import { HtmlPreviewPanel } from './HtmlPreview';
 import { SessionViewerPanel } from './SessionViewer';
 import { SearchPanel } from './SearchPanel';
 import { ClaudeCodePanel } from './ClaudeCodePanel';
+import { TabBar } from './TabBar';
 import { useProjects, uid } from '../store/projects';
 import { useSettings } from '../store/settings';
 import type { Project } from '../types';
@@ -25,7 +28,6 @@ interface ViewerParams { filePath: string }
 interface SessionViewerParams { source: 'claude' | 'codex'; file: string }
 interface SearchParams { projectPath: string }
 
-/** SearchPanel 안에서 dockview 컨테이너를 알 수 없으므로 글로벌 이벤트로 파일 열기 */
 function emitOpenFile(filePath: string, line: number) {
   window.dispatchEvent(new CustomEvent('hermes:open-file', {
     detail: { filePath, line },
@@ -55,31 +57,35 @@ const components = {
 
 interface WorkspaceProps {
   project: Project;
-  /** dockview api 가 준비되면 App 에 넘긴다 (레일에서 파일 뷰어를 열기 위함) */
+  /** dockview api 준비 시 App 에 노출 — 레일·검색·프리뷰가 패널 추가에 사용 */
   onApiReady: (api: DockviewApi) => void;
 }
 
 export function Workspace({ project, onApiReady }: WorkspaceProps) {
-  const { saveLayout } = useProjects();
+  const { saveLayout, addTab, closeTab, setActiveTab, renameTab } = useProjects();
   const { settings } = useSettings();
   const apiRef = useRef<DockviewApi | null>(null);
   const counterRef = useRef(1);
 
+  const activeTab = project.tabs.find((t) => t.id === project.activeTabId) ?? project.tabs[0];
+
   const seed = useCallback((api: DockviewApi) => {
+    const isClaude = settings.chatProvider === 'claude';
     api.addPanel({
       id: uid('panel'),
-      component: 'chat',
-      title: '세션 1',
-      params: { projectId: project.id, tabId: uid('tab') },
+      component: isClaude ? 'claudecode' : 'chat',
+      title: `${isClaude ? 'Claude' : '세션'} 1`,
+      params: { projectId: project.id },
     });
-  }, [project.id]);
+  }, [project.id, settings.chatProvider]);
 
   const onReady = useCallback((event: DockviewReadyEvent) => {
     apiRef.current = event.api;
     onApiReady(event.api);
-    if (project.layout) {
+
+    if (activeTab.layout) {
       try {
-        event.api.fromJSON(project.layout as Parameters<DockviewApi['fromJSON']>[0]);
+        event.api.fromJSON(activeTab.layout as Parameters<DockviewApi['fromJSON']>[0]);
       } catch {
         seed(event.api);
       }
@@ -87,74 +93,58 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
       seed(event.api);
     }
 
-    // 마이그레이션 — 옛 레이아웃에서 복원된 패널은 tabId 없음. 각자 새 tabId 부여.
-    for (const p of event.api.panels) {
-      const params = (p.params ?? {}) as { tabId?: string };
-      if (!params.tabId) {
-        try {
-          p.api.updateParameters({ ...params, tabId: uid('tab') });
-        } catch {
-          // updateParameters 미지원 dockview 버전 — 무시 (closeActiveTab 폴백 동작)
-        }
-      }
-    }
-
     counterRef.current = event.api.panels.length + 1;
 
-    // 레이아웃·제목 변경 모두 영속화 (제목 변경은 onDidLayoutChange 로 안 잡힘)
-    const persist = () => saveLayout(project.id, event.api.toJSON());
+    // 활성 탭 레이아웃 영속화
+    const persist = () => saveLayout(project.id, activeTab.id, event.api.toJSON());
     event.api.onDidLayoutChange(persist);
     for (const panel of event.api.panels) panel.api.onDidTitleChange(persist);
     event.api.onDidAddPanel((panel) => panel.api.onDidTitleChange(persist));
-  }, [project.id, project.layout, saveLayout, seed, onApiReady]);
+  }, [project.id, activeTab.id, activeTab.layout, saveLayout, seed, onApiReady]);
 
-  // 탭 모델 — params.tabId 가 "탭" 정체성. 분할은 같은 tabId, '+ 탭' 은 새 tabId.
-  const addSession = useCallback((mode: 'tab' | 'right' | 'below') => {
+  // 활성 탭 안에서 새 패널 추가 — tab/right/below
+  const addPanel = useCallback((mode: 'tab' | 'right' | 'below') => {
     const api = apiRef.current;
     if (!api) return;
     const isClaude = settings.chatProvider === 'claude';
-
-    const activePanel = api.activePanel;
-    const activeTabId = (activePanel?.params as { tabId?: string } | undefined)?.tabId;
-    const tabId = mode === 'tab' ? uid('tab') : (activeTabId ?? uid('tab'));
-
-    // '+ 탭' = 새 그룹(오른쪽). 분할은 명시 방향
-    const position: { direction: 'right' | 'below' } | undefined =
-      mode === 'tab'
-        ? (api.panels.length > 0 ? { direction: 'right' } : undefined)
-        : { direction: mode };
-
+    const title = `${isClaude ? 'Claude' : '세션'} ${counterRef.current++}`;
     api.addPanel({
       id: uid('panel'),
       component: isClaude ? 'claudecode' : 'chat',
-      title: `${isClaude ? 'Claude' : '세션'} ${counterRef.current++}`,
-      params: { projectId: project.id, tabId },
-      ...(position ? { position } : {}),
+      title,
+      params: { projectId: project.id },
+      ...(mode === 'tab' ? {} : { position: { direction: mode } }),
     });
   }, [project.id, settings.chatProvider]);
 
   return (
     <div className="workspace">
+      <TabBar
+        tabs={project.tabs}
+        activeId={project.activeTabId}
+        onSwitch={(id) => setActiveTab(project.id, id)}
+        onAdd={() => addTab(project.id)}
+        onClose={(id) => closeTab(project.id, id)}
+        onRename={(id, name) => renameTab(project.id, id, name)}
+      />
       <div className="workspace-bar">
         <span className="workspace-title" style={{ color: project.color }} title={project.path}>
           {project.name}
         </span>
         <div className="workspace-actions">
-          <button className="btn btn-ghost" onClick={() => addSession('tab')}
-            title="활성 그룹에 새 탭">
-            + 탭
-          </button>
-          <button className="btn btn-ghost" onClick={() => addSession('below')}
+          <button className="btn btn-ghost" onClick={() => addPanel('below')}
             title="가로선으로 분할 — 위아래 배치">
             ─ 가로 분할
           </button>
-          <button className="btn btn-ghost" onClick={() => addSession('right')}
+          <button className="btn btn-ghost" onClick={() => addPanel('right')}
             title="세로선으로 분할 — 좌우 배치">
             │ 세로 분할
           </button>
         </div>
       </div>
+      {/* key={activeTab.id} → 탭 전환 시 DockviewReact 완전 remount, 각 탭의 layout 복원 */}
       <DockviewReact
+        key={activeTab.id}
         className={`workspace-dock dockview-theme-${
           settings.theme === 'dark' ? 'abyss' : 'light'
         }`}
