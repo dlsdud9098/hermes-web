@@ -99,11 +99,13 @@ function Shell() {
   const splitPanel = useCallback((mode: 'right' | 'below') => {
     const api = dockApiRef.current;
     if (!api || !active) return;
-    const isClaude = settings.chatProvider === 'claude';
+    const p = settings.chatProvider;
+    const comp = p === 'claude' ? 'claudecode' : p === 'codex' ? 'codex' : 'chat';
+    const label = p === 'claude' ? 'Claude' : p === 'codex' ? 'Codex' : '세션';
     api.addPanel({
       id: uid('panel'),
-      component: isClaude ? 'claudecode' : 'chat',
-      title: `${isClaude ? 'Claude' : '세션'} ${api.panels.length + 1}`,
+      component: comp,
+      title: `${label} ${api.panels.length + 1}`,
       params: { projectId: active.id },
       position: { direction: mode },
     });

@@ -4,6 +4,7 @@
 // Hermes 게이트웨이(HTTP/SSE) 는 별도 tauri-plugin-http 로 직접 호출 (CORS 우회).
 
 mod claude_cli;
+mod codex_cli;
 mod fs_walk;
 mod search;
 mod sessions;
@@ -203,6 +204,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .manage(claude_cli::ClaudeSessions::default())
         .manage(claude_cli::RateLimitCache::default())
+        .manage(codex_cli::CodexSessions::default())
         .manage(sessions::SessionIndex::default())
         .setup(|app| {
             // 세션 인덱스 백그라운드 워밍업 — Everything 식 캐시
@@ -225,6 +227,10 @@ pub fn run() {
             claude_cli::claude_stop_all,
             claude_cli::claude_check,
             claude_cli::claude_rate_limit,
+            codex_cli::codex_send,
+            codex_cli::codex_clear_session,
+            codex_cli::codex_check,
+            codex_cli::codex_login_status,
         ])
         .on_window_event(|window, event| {
             // 창 닫히면 모든 Claude PTY 세션 일괄 정리 — 좀비 프로세스 방지

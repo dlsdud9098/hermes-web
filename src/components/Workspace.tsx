@@ -18,6 +18,7 @@ import { HtmlPreviewPanel } from './HtmlPreview';
 import { SessionViewerPanel } from './SessionViewer';
 import { SearchPanel } from './SearchPanel';
 import { ClaudeCodePanel } from './ClaudeCodePanel';
+import { CodexPanel } from './CodexPanel';
 import { TabBar } from './TabBar';
 import { useProjects, uid } from '../store/projects';
 import { useSettings } from '../store/settings';
@@ -53,6 +54,9 @@ const components = {
   claudecode: (props: IDockviewPanelProps<ChatParams>) => (
     <ClaudeCodePanel panelId={props.api.id} projectId={props.params.projectId} />
   ),
+  codex: (props: IDockviewPanelProps<ChatParams>) => (
+    <CodexPanel panelId={props.api.id} projectId={props.params.projectId} />
+  ),
 };
 
 interface WorkspaceProps {
@@ -70,11 +74,15 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
   const activeTab = project.tabs.find((t) => t.id === project.activeTabId) ?? project.tabs[0];
 
   const seed = useCallback((api: DockviewApi) => {
-    const isClaude = settings.chatProvider === 'claude';
+    const provider = settings.chatProvider;
+    const comp = provider === 'claude' ? 'claudecode'
+      : provider === 'codex' ? 'codex' : 'chat';
+    const label = provider === 'claude' ? 'Claude'
+      : provider === 'codex' ? 'Codex' : '세션';
     api.addPanel({
       id: uid('panel'),
-      component: isClaude ? 'claudecode' : 'chat',
-      title: `${isClaude ? 'Claude' : '세션'} 1`,
+      component: comp,
+      title: `${label} 1`,
       params: { projectId: project.id },
     });
   }, [project.id, settings.chatProvider]);

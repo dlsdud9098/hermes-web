@@ -3,7 +3,7 @@
 import { DEFAULT_KEYMAP, type ShortcutAction } from './keybindings';
 
 /** 채팅 백엔드 — 새 세션 탭 만들 때 자동 선택 */
-export type ChatProvider = 'hermes' | 'claude';
+export type ChatProvider = 'hermes' | 'claude' | 'codex';
 
 export interface ThemePresetVars {
   bg: string;

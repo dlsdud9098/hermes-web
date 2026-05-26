@@ -183,9 +183,10 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               <>
                 <Row label="채팅 백엔드">
                   <select value={settings.chatProvider}
-                    onChange={(e) => update({ chatProvider: e.target.value as 'hermes' | 'claude' })}>
+                    onChange={(e) => update({ chatProvider: e.target.value as 'hermes' | 'claude' | 'codex' })}>
                     <option value="hermes">Hermes Agent</option>
                     <option value="claude">Claude Code (Max 구독)</option>
+                    <option value="codex">Codex (ChatGPT Plus/Pro)</option>
                   </select>
                 </Row>
                 <Row label="Enter 동작">

@@ -86,7 +86,8 @@ export function StatusBar({ panelCount }: StatusBarProps) {
       )}
       <span className="statusbar-item">패널 {panelCount}</span>
       <span className="statusbar-item">
-        {settings.chatProvider === 'claude' ? 'Claude' : 'Hermes'}
+        {settings.chatProvider === 'claude' ? 'Claude'
+          : settings.chatProvider === 'codex' ? 'Codex' : 'Hermes'}
       </span>
       <span className="statusbar-spacer" />
       {settings.chatProvider === 'claude' && (
