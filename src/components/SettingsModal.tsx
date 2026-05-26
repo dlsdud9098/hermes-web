@@ -1,6 +1,6 @@
-// 설정 모달 — 세로 탭(외형/채팅/에디터/파일). 변경 즉시 적용·저장.
+// 설정 모달 — 세로 탭(외형/채팅/에디터/파일/단축키/계정). 변경 즉시 적용·저장.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { FONT_OPTIONS, THEME_PRESETS, WEIGHT_OPTIONS, getPreset } from '../settings';
 import { useSettings } from '../store/settings';
@@ -8,13 +8,23 @@ import {
   ACTIONS, DEFAULT_KEYMAP, keyEventToCombo,
   type ShortcutAction,
 } from '../keybindings';
+import {
+  accountsList, accountAddCurrent, accountRemove, accountSetActive,
+  accountRename, accountAutoRotateGet, accountAutoRotateSet,
+  type AccountWithStatus, type AutoRotateConfig, type Provider,
+} from '../api/accounts';
+import { isTauri } from '../runtime';
 
-const TABS = [
+export type SettingsTabId =
+  | 'appearance' | 'chat' | 'editor' | 'files' | 'keys' | 'accounts';
+
+const TABS: { id: SettingsTabId; label: string }[] = [
   { id: 'appearance', label: '외형' },
   { id: 'chat', label: '채팅' },
   { id: 'editor', label: '에디터' },
   { id: 'files', label: '파일' },
   { id: 'keys', label: '단축키' },
+  { id: 'accounts', label: '계정' },
 ];
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -79,9 +89,11 @@ function KeymapRow({
   );
 }
 
-export function SettingsModal({ onClose }: { onClose: () => void }) {
+export function SettingsModal({
+  onClose, initialTab = 'appearance',
+}: { onClose: () => void; initialTab?: SettingsTabId }) {
   const { settings, update } = useSettings();
-  const [tab, setTab] = useState('appearance');
+  const [tab, setTab] = useState<SettingsTabId>(initialTab);
 
   // 같은 콤보를 쓰는 액션이 2개 이상이면 양쪽 빨갛게
   const conflicts = new Set<ShortcutAction>();
@@ -255,6 +267,8 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
               </>
             )}
 
+            {tab === 'accounts' && <AccountsTab />}
+
             {tab === 'keys' && (
               <div className="keymap-list">
                 <div className="keymap-hint">
@@ -287,6 +301,210 @@ export function SettingsModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** 계정 풀 탭 — Claude/Codex 별 계정 목록 + 자동 로테이션 설정 */
+function AccountsTab() {
+  const [claudeList, setClaudeList] = useState<AccountWithStatus[]>([]);
+  const [codexList, setCodexList] = useState<AccountWithStatus[]>([]);
+  const [rotate, setRotate] = useState<AutoRotateConfig>({ enabled: false, threshold_pct: 5 });
+  const [err, setErr] = useState<string | null>(null);
+
+  async function refresh() {
+    if (!isTauri) return;
+    try {
+      const [c, x, r] = await Promise.all([
+        accountsList('claude'),
+        accountsList('codex'),
+        accountAutoRotateGet(),
+      ]);
+      setClaudeList(c);
+      setCodexList(x);
+      setRotate(r);
+      setErr(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  useEffect(() => { void refresh(); }, []);
+
+  if (!isTauri) {
+    return <div className="keymap-hint">계정 풀은 데스크톱 앱에서만 사용 가능합니다.</div>;
+  }
+
+  return (
+    <div className="accounts-tab">
+      {err && <div className="accounts-err">{err}</div>}
+
+      <ProviderSection
+        provider="claude"
+        title="Claude"
+        list={claudeList}
+        onChanged={refresh}
+      />
+
+      <ProviderSection
+        provider="codex"
+        title="Codex"
+        list={codexList}
+        onChanged={refresh}
+      />
+
+      <div className="accounts-section">
+        <div className="accounts-section-head">자동 로테이션</div>
+        <div className="keymap-hint">
+          현재 활성 계정의 남은 한도가 임계치 이하로 떨어지면 풀에서 여유 있는 계정으로 자동 전환.
+        </div>
+        <div className="accounts-rotate-toggle">
+          <label className="settings-inline">
+            <input
+              type="checkbox"
+              checked={rotate.enabled}
+              onChange={async (e) => {
+                const next = { ...rotate, enabled: e.target.checked };
+                setRotate(next);
+                try { await accountAutoRotateSet(next); }
+                catch (er) { setErr(er instanceof Error ? er.message : String(er)); }
+              }}
+            />
+            <span>활성화</span>
+          </label>
+          <span className="settings-inline">
+            <span className="keymap-label">임계 %</span>
+            <input
+              type="range" min={1} max={50}
+              value={rotate.threshold_pct}
+              onChange={(e) => setRotate({ ...rotate, threshold_pct: Number(e.target.value) })}
+              onMouseUp={async () => {
+                try { await accountAutoRotateSet(rotate); }
+                catch (er) { setErr(er instanceof Error ? er.message : String(er)); }
+              }}
+              onTouchEnd={async () => {
+                try { await accountAutoRotateSet(rotate); }
+                catch (er) { setErr(er instanceof Error ? er.message : String(er)); }
+              }}
+            />
+            <span className="settings-val">{rotate.threshold_pct}%</span>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProviderSection({
+  provider, title, list, onChanged,
+}: {
+  provider: Provider;
+  title: string;
+  list: AccountWithStatus[];
+  onChanged: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+
+  async function handleAdd() {
+    const label = window.prompt(
+      `${title} 계정 라벨 (예: main, work)`, '',
+    )?.trim();
+    if (!label) return;
+    setBusy(true);
+    try {
+      await accountAddCurrent(provider, label);
+      await onChanged();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRemove(id: string, label: string) {
+    if (!window.confirm(`'${label}' 계정을 삭제할까요? 저장된 인증 토큰이 풀에서 제거됩니다.`)) return;
+    try {
+      await accountRemove(provider, id);
+      await onChanged();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function handleActivate(id: string) {
+    try {
+      await accountSetActive(provider, id);
+      await onChanged();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function handleRename(id: string, label: string) {
+    setEditing(null);
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    try {
+      await accountRename(provider, id, trimmed);
+      await onChanged();
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  return (
+    <div className="accounts-section">
+      <div className="accounts-section-head">
+        <span>{title}</span>
+        <button className="btn btn-ghost" disabled={busy} onClick={handleAdd}>
+          현재 로그인 풀에 추가
+        </button>
+      </div>
+      {list.length === 0 ? (
+        <div className="keymap-hint">
+          등록된 계정 없음. 외부 터미널에서 <code>{provider} login</code> 후
+          '현재 로그인 풀에 추가' 클릭.
+        </div>
+      ) : (
+        list.map((a) => (
+          <div key={a.id} className="account-row">
+            {editing === a.id ? (
+              <input
+                className="account-label-edit"
+                defaultValue={a.label}
+                autoFocus
+                onBlur={(e) => void handleRename(a.id, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { void handleRename(a.id, e.currentTarget.value); }
+                  if (e.key === 'Escape') { setEditing(null); }
+                }}
+              />
+            ) : (
+              <span
+                className="account-label"
+                title="더블클릭으로 이름 변경"
+                onDoubleClick={() => setEditing(a.id)}
+              >
+                {a.label}
+              </span>
+            )}
+            {a.is_active && <span className="account-active-badge">활성</span>}
+            <span className="account-row-spacer" />
+            {!a.is_active && (
+              <button className="btn btn-ghost" onClick={() => void handleActivate(a.id)}>
+                전환
+              </button>
+            )}
+            <button
+              className="btn btn-ghost account-del"
+              onClick={() => void handleRemove(a.id, a.label)}
+            >
+              삭제
+            </button>
+          </div>
+        ))
+      )}
     </div>
   );
 }

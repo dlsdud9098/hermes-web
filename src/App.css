@@ -1387,3 +1387,146 @@
 }
 /* 잘라내기 대기 중인 항목 — 반투명 */
 .tree-row-cut { opacity: 0.5; font-style: italic; }
+
+/* ── 계정 풀 (Claude/Codex) ─────────────── */
+.accounts-tab { display: flex; flex-direction: column; gap: 16px; }
+.accounts-err {
+  padding: 6px 8px;
+  background: rgba(247, 118, 142, 0.12);
+  border: 1px solid #f7768e;
+  border-radius: 4px;
+  color: #f7768e;
+  font-size: 11px;
+}
+.accounts-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.accounts-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--text);
+  font-size: 12px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 0;
+}
+.account-label {
+  color: var(--text);
+  cursor: text;
+  user-select: none;
+}
+.account-label-edit {
+  background: var(--bg-panel);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 6px;
+}
+.account-active-badge {
+  padding: 1px 6px;
+  background: var(--accent);
+  color: var(--bg);
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.account-row-spacer { flex: 1; }
+.account-del { color: #f7768e !important; }
+.account-del:hover { border-color: #f7768e !important; }
+
+.accounts-rotate-toggle {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+/* StatusBar 활성 계정 + 팝오버 */
+.statusbar-account { position: relative; }
+.accounts-popover {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  z-index: 250;
+  min-width: 160px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.accounts-popover-empty {
+  padding: 6px 8px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.accounts-popover-item {
+  text-align: left;
+  padding: 5px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.accounts-popover-item:hover {
+  background: var(--bg-bar);
+  color: var(--accent);
+}
+.accounts-popover-manage {
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+  color: var(--text-dim);
+}
+
+/* 토스트 — 자동 로테이션 알림 */
+.toast-container {
+  position: fixed;
+  right: 16px;
+  bottom: 40px;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+.toast {
+  background: var(--bg-panel);
+  border: 1px solid var(--accent);
+  border-left: 3px solid var(--accent);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  animation: toast-in 200ms ease-out;
+  min-width: 220px;
+  max-width: 360px;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}

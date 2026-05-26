@@ -1,7 +1,7 @@
 // 하단 상태바 — 활성 프로젝트/탭, 패널 수, 백엔드,
 // 그리고 백엔드별 구독 사용량 (Claude OAuth API / Codex chatgpt.com 비공개 엔드포인트).
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useProjects } from '../store/projects';
 import { useSettings } from '../store/settings';
 import { invoke, isTauri } from '../runtime';
@@ -9,6 +9,10 @@ import {
   claudeUsage, codexUsage, fmtRemaining,
   type ClaudeUsage, type CodexUsage,
 } from '../api/usage';
+import {
+  accountsList, accountSetActive, onAccountRotated,
+  type AccountWithStatus, type Provider,
+} from '../api/accounts';
 
 interface ClaudeStatus {
   installed: boolean;
@@ -31,6 +35,46 @@ export function StatusBar({ panelCount }: StatusBarProps) {
   const [cu, setCu] = useState<ClaudeUsage | null>(null);
   const [xu, setXu] = useState<CodexUsage | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const [accounts, setAccounts] = useState<AccountWithStatus[]>([]);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
+  const toastIdRef = useRef(1);
+
+  const provider: Provider | null =
+    settings.chatProvider === 'claude' ? 'claude'
+    : settings.chatProvider === 'codex' ? 'codex'
+    : null;
+
+  async function reloadAccounts() {
+    if (!isTauri || !provider) { setAccounts([]); return; }
+    try {
+      setAccounts(await accountsList(provider));
+    } catch {
+      setAccounts([]);
+    }
+  }
+
+  useEffect(() => { void reloadAccounts(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [provider]);
+
+  // 자동 로테이션 이벤트 → 토스트 + 목록 갱신
+  useEffect(() => {
+    if (!isTauri) return;
+    let unlisten: (() => void) | undefined;
+    void onAccountRotated((ev) => {
+      const id = toastIdRef.current++;
+      const text = `계정 전환: ${ev.from_label} → ${ev.to_label} (${ev.reason})`;
+      setToasts((t) => [...t, { id, text }]);
+      window.setTimeout(() => {
+        setToasts((t) => t.filter((x) => x.id !== id));
+      }, 4000);
+      void reloadAccounts();
+    }).then((fn) => { unlisten = fn; });
+    return () => { if (unlisten) unlisten(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider]);
+
+  const activeAccount = accounts.find((a) => a.is_active) ?? null;
 
   useEffect(() => {
     if (!isTauri) return;
@@ -71,6 +115,7 @@ export function StatusBar({ panelCount }: StatusBarProps) {
     : 'Claude: 점검 중';
 
   return (
+    <>
     <div className="statusbar">
       {active ? (
         <>
@@ -88,6 +133,57 @@ export function StatusBar({ panelCount }: StatusBarProps) {
         {settings.chatProvider === 'claude' ? 'Claude'
           : settings.chatProvider === 'codex' ? 'Codex' : 'Hermes'}
       </span>
+
+      {provider && (
+        <span
+          className="statusbar-item statusbar-clickable statusbar-account"
+          title="활성 계정 · 클릭하여 빠른 전환"
+          onClick={() => setPopoverOpen((v) => !v)}
+        >
+          {provider === 'claude' ? 'Claude' : 'Codex'} ·{' '}
+          {activeAccount ? activeAccount.label : '계정 없음'}
+          {popoverOpen && (
+            <span
+              className="accounts-popover"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {accounts.length === 0 && (
+                <span className="accounts-popover-empty">
+                  등록된 계정 없음
+                </span>
+              )}
+              {accounts.filter((a) => !a.is_active).map((a) => (
+                <button
+                  key={a.id}
+                  className="accounts-popover-item"
+                  onClick={async () => {
+                    try {
+                      await accountSetActive(provider, a.id);
+                      await reloadAccounts();
+                    } catch (err) {
+                      window.alert(err instanceof Error ? err.message : String(err));
+                    }
+                    setPopoverOpen(false);
+                  }}
+                >
+                  {a.label}
+                </button>
+              ))}
+              <button
+                className="accounts-popover-item accounts-popover-manage"
+                onClick={() => {
+                  setPopoverOpen(false);
+                  window.dispatchEvent(new CustomEvent('hermes:open-settings', {
+                    detail: { tab: 'accounts' },
+                  }));
+                }}
+              >
+                관리…
+              </button>
+            </span>
+          )}
+        </span>
+      )}
 
       <span className="statusbar-spacer" />
 
@@ -164,6 +260,14 @@ export function StatusBar({ panelCount }: StatusBarProps) {
         </span>
       )}
     </div>
+    {toasts.length > 0 && (
+      <div className="toast-container">
+        {toasts.map((t) => (
+          <div key={t.id} className="toast">{t.text}</div>
+        ))}
+      </div>
+    )}
+    </>
   );
 }
 

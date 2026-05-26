@@ -22,6 +22,9 @@ function Shell() {
   const active = projects.find((p) => p.id === activeId) ?? projects[0];
   const [pickerOpen, setPickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<
+    'appearance' | 'chat' | 'editor' | 'files' | 'keys' | 'accounts'
+  >('appearance');
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [treeOpen, setTreeOpen] = useState(true);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -48,7 +51,16 @@ function Shell() {
       });
     }
     window.addEventListener('hermes:open-preview', onOpenPreview);
-    return () => window.removeEventListener('hermes:open-preview', onOpenPreview);
+    function onOpenSettings(e: Event) {
+      const ce = e as CustomEvent<{ tab?: typeof settingsInitialTab }>;
+      if (ce.detail?.tab) setSettingsInitialTab(ce.detail.tab);
+      setSettingsOpen(true);
+    }
+    window.addEventListener('hermes:open-settings', onOpenSettings);
+    return () => {
+      window.removeEventListener('hermes:open-preview', onOpenPreview);
+      window.removeEventListener('hermes:open-settings', onOpenSettings);
+    };
   }, []);
 
   // SearchPanel 의 결과 클릭 → FileViewer 패널 열기 (line 은 후속 기능)
@@ -288,7 +300,12 @@ function Shell() {
           onPick={(path) => { openProject(path); setPickerOpen(false); }}
         />
       )}
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && (
+        <SettingsModal
+          onClose={() => setSettingsOpen(false)}
+          initialTab={settingsInitialTab}
+        />
+      )}
       {sessionsOpen && (
         <SessionBrowser
           onClose={() => setSessionsOpen(false)}
