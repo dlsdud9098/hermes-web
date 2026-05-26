@@ -1191,3 +1191,19 @@
   cursor: zoom-in;
   margin: 6px 0;
 }
+
+/* 프로젝트 레일 — 닫기 ✕ 버튼 (hover 노출) */
+.rail-tab { cursor: pointer; position: relative; }
+.rail-x {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 10px;
+  padding: 0 4px;
+  opacity: 0;
+  cursor: pointer;
+}
+.rail-tab:hover .rail-x,
+.rail-tab-active .rail-x { opacity: 1; }
+.rail-x:hover { color: #f7768e; }

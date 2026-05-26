@@ -28,21 +28,34 @@ export function ProjectRail({
     }
   }
 
+  function onCloseProject(e: React.MouseEvent, id: string, name: string) {
+    e.stopPropagation();
+    const ok = window.confirm(`프로젝트 닫기 — '${name}'\n탭/레이아웃은 localStorage 에서 제거됨.`);
+    if (ok) removeProject(id);
+  }
+
   return (
     <nav className="rail">
       <div className="rail-scroll">
         {projects.map((p) => (
           <div key={p.id}>
-            <button
+            <div
               className={`rail-tab${p.id === activeId ? ' rail-tab-active' : ''}`}
               style={{ borderLeftColor: p.id === activeId ? p.color : 'transparent' }}
               onClick={() => onTabClick(p.id)}
-              onAuxClick={(e) => { if (e.button === 1) removeProject(p.id); }}
-              title={`${p.name}\n${p.path}\n(가운데 클릭: 닫기)`}
+              onAuxClick={(e) => { if (e.button === 1) onCloseProject(e, p.id, p.name); }}
+              title={`${p.name}\n${p.path}`}
             >
               <span className="rail-dot" style={{ background: p.color }} />
               <span className="rail-name">{p.name}</span>
-            </button>
+              <button
+                className="rail-x"
+                onClick={(e) => onCloseProject(e, p.id, p.name)}
+                title="프로젝트 닫기"
+              >
+                ✕
+              </button>
+            </div>
             {p.id === activeId && treeOpen && (
               <div className="rail-tree">
                 <FileTreePanel rootPath={p.path} onOpenFile={onOpenFile} />
