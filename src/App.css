@@ -1245,3 +1245,10 @@
   color: var(--text-dim);
   opacity: 0.8;
 }
+
+/* Tail 활성 상태 버튼 */
+.btn-active {
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+  background: rgba(122, 162, 247, 0.15);
+}

@@ -50,6 +50,8 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
+  /** 자동 tail — 로그 파일처럼 파일이 커지면 끝으로 자동 스크롤 */
+  const [follow, setFollow] = useState(false);
   const saveTimer = useRef<number | null>(null);
   const viewRef = useRef<EditorView | null>(null);
 
@@ -60,6 +62,35 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
       .then((d) => { setData(d); setDraft(d.content); })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [filePath]);
+
+  // tail follow — 1초마다 readFile 재호출. 새 내용이 있으면 갱신 + 맨 끝 스크롤
+  useEffect(() => {
+    if (!follow) return;
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const fresh = await readFile(filePath);
+        if (cancelled) return;
+        if (!data || fresh.content !== data.content) {
+          setData(fresh);
+          // 사용자가 편집 중이 아니면 (=dirty 아닐 때) draft 도 갱신
+          setDraft((cur) => (cur === (data?.content ?? '') ? fresh.content : cur));
+          const view = viewRef.current;
+          if (view) {
+            view.dispatch({
+              selection: { anchor: view.state.doc.length },
+              scrollIntoView: true,
+            });
+          }
+        }
+      } catch {
+        // 일회 실패는 무시 (파일 회전 등)
+      }
+    };
+    const handle = window.setInterval(() => { void tick(); }, 1000);
+    return () => { cancelled = true; window.clearInterval(handle); };
+  }, [follow, filePath, data]);
 
   const ext = extOf(filePath);
   const isMarkdown = ext === 'md' || ext === 'markdown';
@@ -157,21 +188,26 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
         }
       }}
     >
-      {(dirty || isPreviewable) && (
-        <div className="fileviewer-bar">
-          {dirty && <span className="fileviewer-dirty">● 저장 안 됨</span>}
-          {isPreviewable && (
-            <button className="btn btn-ghost" onClick={openPreview} title="Ctrl+P">
-              👁 프리뷰
-            </button>
-          )}
-          {dirty && (
-            <button className="btn" disabled={saving} onClick={() => void save()}>
-              {saving ? '저장 중…' : '저장 (Ctrl+S)'}
-            </button>
-          )}
-        </div>
-      )}
+      <div className="fileviewer-bar">
+        {dirty && <span className="fileviewer-dirty">● 저장 안 됨</span>}
+        {isPreviewable && (
+          <button className="btn btn-ghost" onClick={openPreview} title="Ctrl+P">
+            👁 프리뷰
+          </button>
+        )}
+        <button
+          className={`btn btn-ghost${follow ? ' btn-active' : ''}`}
+          onClick={() => setFollow((v) => !v)}
+          title="1초마다 파일 재읽기 + 끝으로 자동 스크롤 (로그 파일용)"
+        >
+          {follow ? '⏬ Tail 중' : '⏬ Tail'}
+        </button>
+        {dirty && (
+          <button className="btn" disabled={saving} onClick={() => void save()}>
+            {saving ? '저장 중…' : '저장 (Ctrl+S)'}
+          </button>
+        )}
+      </div>
 
       {error && <div className="chat-error">⚠ {error}</div>}
       {data?.truncated && (
