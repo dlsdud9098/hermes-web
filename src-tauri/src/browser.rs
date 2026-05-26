@@ -1,26 +1,25 @@
-// 인앱 브라우저 — Tauri 2 자식 webview 를 메인 윈도우 안에 임베드.
-// MCP 없음 — 직접 Tauri 커맨드로 제어. 같은 커맨드를 에이전트도 호출 가능.
+// 인앱 브라우저 (실용판) — 별도 borderless WebviewWindow 를 메인 위에 겹쳐 띄움.
 //
-// 모델:
-//   panel_id ↔ webview label "browser-<panel_id>" 1:1 매핑
-//   프론트엔드 BrowserPanel 이 div bbox 를 ResizeObserver 로 측정 →
-//     browser_set_bounds 로 webview 위치/크기 동기화
-//   탭 전환/패널 숨김 시 set_visible(false)
+// 멀티 webview (`add_child`) 가 Linux 에서 깨져 있어 회피 (tauri#10420/11376/10011).
+// WebviewWindow 는 Win/Mac/Linux 모두 안정.
+//
+// 흐름:
+//   1) 프론트가 패널 slot 의 절대 화면 좌표(메인 윈도우 inner pos + bbox) 계산
+//   2) browser_create 가 그 좌표/크기로 decorations=false, skip_taskbar, parent(main) 윈도우 spawn
+//   3) ResizeObserver/Interval/메인 이동 등으로 좌표 변화 → browser_set_bounds
+//   4) 패널이 화면 밖으로 가거나 탭이 비활성 → browser_hide
+//   5) 패널 unmount → browser_close
 
-use serde::Serialize;
 use std::sync::Mutex;
-use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl};
+use tauri::{
+    AppHandle, LogicalPosition, LogicalSize, Manager,
+    WebviewUrl, WebviewWindowBuilder,
+};
 use url::Url;
 
 #[derive(Default)]
 pub struct BrowserRegistry {
-    /// 살아있는 webview label 추적 — 중복 create 방지용
     pub labels: Mutex<Vec<String>>,
-}
-
-#[derive(Serialize)]
-pub struct EvalResult {
-    pub value: serde_json::Value,
 }
 
 fn label_for(panel_id: &str) -> String {
@@ -49,31 +48,34 @@ pub async fn browser_create(
     state: tauri::State<'_, BrowserRegistry>,
     panel_id: String,
     url: String,
-    x: f64,
-    y: f64,
-    w: f64,
-    h: f64,
+    x: f64, y: f64, w: f64, h: f64,
 ) -> Result<(), String> {
     let label = label_for(&panel_id);
     {
         let labels = state.labels.lock().unwrap();
-        if labels.contains(&label) {
-            return Ok(()); // 이미 존재
-        }
+        if labels.contains(&label) { return Ok(()); }
     }
-    // Window 가 add_child 를 갖고 있음. WebviewWindow 는 그 위 합성.
-    let window = app
-        .get_window("main")
+    let main = app
+        .get_webview_window("main")
         .ok_or_else(|| "main window 없음".to_string())?;
-
     let parsed = parse_url(&url)?;
-    let builder = WebviewBuilder::new(&label, WebviewUrl::External(parsed));
 
-    let pos = LogicalPosition::new(x, y);
-    let size = LogicalSize::new(w.max(1.0), h.max(1.0));
-    window
-        .add_child(builder, pos, size)
-        .map_err(|e| format!("webview 생성 실패: {}", e))?;
+    let builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::External(parsed))
+        .title("hermes-web browser")
+        .decorations(false)
+        .resizable(true)
+        .skip_taskbar(true)
+        .inner_size(w.max(50.0), h.max(50.0))
+        .position(x, y);
+    // 부모 = 메인 — 메인 닫히면 같이 닫힘, 포커스 동반.
+    // parent() 가 Result 또는 self 를 반환하는 버전 차이 → 두 경우 모두 처리.
+    let builder = match builder.parent(&main) {
+        Ok(b) => b,
+        Err(_) => return Err("parent 설정 실패".into()),
+    };
+    let _wv = builder
+        .build()
+        .map_err(|e| format!("browser window 생성: {}", e))?;
 
     state.labels.lock().unwrap().push(label);
     Ok(())
@@ -87,14 +89,13 @@ pub async fn browser_navigate(
 ) -> Result<(), String> {
     let label = label_for(&panel_id);
     let wv = app
-        .webviews()
-        .into_iter()
-        .find(|(l, _)| l == &label)
-        .map(|(_, v)| v)
-        .ok_or_else(|| "webview 없음 — browser_create 먼저".to_string())?;
+        .get_webview_window(&label)
+        .ok_or_else(|| "browser window 없음 — browser_create 먼저".to_string())?;
     let parsed = parse_url(&url)?;
-    // Tauri 2 webview 는 직접 navigate 가 없음 → JS 로 location 설정
-    let js = format!("window.location.href = {}", serde_json::to_string(parsed.as_str()).unwrap());
+    let js = format!(
+        "window.location.href = {}",
+        serde_json::to_string(parsed.as_str()).unwrap()
+    );
     wv.eval(&js).map_err(|e| format!("navigate: {}", e))?;
     Ok(())
 }
@@ -103,21 +104,13 @@ pub async fn browser_navigate(
 pub async fn browser_set_bounds(
     app: AppHandle,
     panel_id: String,
-    x: f64,
-    y: f64,
-    w: f64,
-    h: f64,
+    x: f64, y: f64, w: f64, h: f64,
 ) -> Result<(), String> {
     let label = label_for(&panel_id);
-    let wv = app
-        .webviews()
-        .into_iter()
-        .find(|(l, _)| l == &label)
-        .map(|(_, v)| v);
-    let Some(wv) = wv else { return Ok(()); };
+    let Some(wv) = app.get_webview_window(&label) else { return Ok(()); };
     wv.set_position(LogicalPosition::new(x, y))
         .map_err(|e| format!("set_position: {}", e))?;
-    wv.set_size(LogicalSize::new(w.max(1.0), h.max(1.0)))
+    wv.set_size(LogicalSize::new(w.max(50.0), h.max(50.0)))
         .map_err(|e| format!("set_size: {}", e))?;
     Ok(())
 }
@@ -129,18 +122,9 @@ pub async fn browser_set_visible(
     visible: bool,
 ) -> Result<(), String> {
     let label = label_for(&panel_id);
-    let wv = app
-        .webviews()
-        .into_iter()
-        .find(|(l, _)| l == &label)
-        .map(|(_, v)| v);
-    let Some(wv) = wv else { return Ok(()); };
-    // 숨김은 화면 밖으로 이동 (set_visible API 가 안정 미보장)
-    if visible {
-        // 위치는 set_bounds 가 다시 잡음. 노-op
-    } else {
-        let _ = wv.set_position(LogicalPosition::new(-10000.0, -10000.0));
-    }
+    let Some(wv) = app.get_webview_window(&label) else { return Ok(()); };
+    if visible { wv.show().map_err(|e| e.to_string())?; }
+    else       { wv.hide().map_err(|e| e.to_string())?; }
     Ok(())
 }
 
@@ -151,15 +135,13 @@ pub async fn browser_close(
     panel_id: String,
 ) -> Result<(), String> {
     let label = label_for(&panel_id);
-    if let Some((_, wv)) = app.webviews().into_iter().find(|(l, _)| l == &label) {
+    if let Some(wv) = app.get_webview_window(&label) {
         let _ = wv.close();
     }
     state.labels.lock().unwrap().retain(|l| l != &label);
     Ok(())
 }
 
-/// 에이전트/UI 가 임베드 브라우저 안에서 JS 실행 — click/fill/scroll 등.
-/// JS 의 마지막 식 값이 result 로 반환되지 않으므로 코드 안에서 `__ret = ...` 패턴 권장.
 #[tauri::command]
 pub async fn browser_eval(
     app: AppHandle,
@@ -168,11 +150,8 @@ pub async fn browser_eval(
 ) -> Result<(), String> {
     let label = label_for(&panel_id);
     let wv = app
-        .webviews()
-        .into_iter()
-        .find(|(l, _)| l == &label)
-        .map(|(_, v)| v)
-        .ok_or_else(|| "webview 없음".to_string())?;
+        .get_webview_window(&label)
+        .ok_or_else(|| "browser window 없음".to_string())?;
     wv.eval(&code).map_err(|e| format!("eval: {}", e))?;
     Ok(())
 }
