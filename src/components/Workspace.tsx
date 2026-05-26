@@ -86,6 +86,19 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
     } else {
       seed(event.api);
     }
+
+    // 마이그레이션 — 옛 레이아웃에서 복원된 패널은 tabId 없음. 각자 새 tabId 부여.
+    for (const p of event.api.panels) {
+      const params = (p.params ?? {}) as { tabId?: string };
+      if (!params.tabId) {
+        try {
+          p.api.updateParameters({ ...params, tabId: uid('tab') });
+        } catch {
+          // updateParameters 미지원 dockview 버전 — 무시 (closeActiveTab 폴백 동작)
+        }
+      }
+    }
+
     counterRef.current = event.api.panels.length + 1;
 
     // 레이아웃·제목 변경 모두 영속화 (제목 변경은 onDidLayoutChange 로 안 잡힘)
