@@ -201,12 +201,19 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
         .manage(claude_cli::ClaudeSessions::default())
+        .manage(sessions::SessionIndex::default())
+        .setup(|app| {
+            // 세션 인덱스 백그라운드 워밍업 — Everything 식 캐시
+            sessions::start_indexer(app.handle().clone());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             fs_list,
             fs_read,
             fs_write,
             fs_skills,
             sessions::sessions_list,
+            sessions::sessions_refresh,
             sessions::session_load,
             search::search_in_dir,
             claude_cli::claude_start,

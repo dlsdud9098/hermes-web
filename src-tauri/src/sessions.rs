@@ -3,14 +3,16 @@
 //   - Codex:       ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl
 // 레코드 포맷이 서로 다르므로 source 별로 파싱 → 공통 SessionMsg 로 정규화한다.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
+use std::sync::Mutex;
+use std::time::{Duration, UNIX_EPOCH};
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct SessionMeta {
     pub source: String,
     pub id: String,
@@ -135,6 +137,7 @@ fn extract_text(content: &Value) -> Option<String> {
 
 // ────────────────────── Claude Code ──────────────────────
 
+#[allow(dead_code)]
 fn list_claude(out: &mut Vec<SessionMeta>) -> Result<(), String> {
     let root = home()?.join(".claude").join("projects");
     let proj_dirs = match fs::read_dir(&root) {
@@ -246,6 +249,7 @@ fn walk_codex(dir: &Path, depth: u32, out: &mut Vec<PathBuf>) {
     }
 }
 
+#[allow(dead_code)]
 fn list_codex(out: &mut Vec<SessionMeta>) -> Result<(), String> {
     let root = home()?.join(".codex").join("sessions");
     if !root.exists() {
@@ -337,22 +341,208 @@ fn load_codex(path: &Path) -> Result<Vec<SessionMsg>, String> {
     Ok(msgs)
 }
 
+// ────────────────────── 인덱스 (Everything 식 캐시) ──────────────────────
+// 앱 시작 시 한 번 스캔해 메모리에 보관. 이후 sessions_list 는 캐시 필터만.
+// 파일 mtime + size 가 그대로면 title/cwd 재파싱 스킵 — 증분 스캔으로 lag 0.
+
+#[derive(Clone)]
+struct CacheEntry {
+    meta: SessionMeta,
+    /// 캐시 검증 — 파일이 변하지 않았으면 재파싱 skip
+    cached_mtime: u64,
+    cached_size: u64,
+}
+
+#[derive(Default)]
+pub struct SessionIndex {
+    /// 키 = 절대 파일 경로
+    entries: Mutex<HashMap<String, CacheEntry>>,
+    /// 마지막 전체 스캔 완료 시점 (epoch ms) — 0 이면 아직 미초기화
+    last_scan_ms: Mutex<u64>,
+}
+
+fn scan_one_claude(p: &Path, cache: &HashMap<String, CacheEntry>) -> Option<SessionMeta> {
+    let id = p.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
+    let (m, sz) = modified_ms_and_size(p);
+    let key = p.to_string_lossy().to_string();
+    // 캐시 hit — 변경 없으면 그대로
+    if let Some(e) = cache.get(&key) {
+        if e.cached_mtime == m && e.cached_size == sz {
+            return Some(e.meta.clone());
+        }
+    }
+    let (title, cwd) = scan_head(p, 100, |v| {
+        let mut t = None;
+        let mut c = None;
+        if v.get("type").and_then(|x| x.as_str()) == Some("user") {
+            if let Some(msg) = v.get("message") {
+                if let Some(content) = msg.get("content") {
+                    if let Some(s) = extract_text(content) {
+                        t = Some(truncate(&s, 120));
+                    }
+                }
+            }
+        }
+        if let Some(s) = v.get("cwd").and_then(|x| x.as_str()) {
+            c = Some(s.to_string());
+        }
+        (t, c)
+    });
+    Some(SessionMeta {
+        source: "claude".into(),
+        id,
+        file: key,
+        cwd,
+        title: title.unwrap_or_else(|| "(빈 세션)".into()),
+        modified_ms: m,
+        size: sz,
+    })
+}
+
+fn scan_one_codex(p: &Path, cache: &HashMap<String, CacheEntry>) -> Option<SessionMeta> {
+    let id = p.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
+    let (m, sz) = modified_ms_and_size(p);
+    let key = p.to_string_lossy().to_string();
+    if let Some(e) = cache.get(&key) {
+        if e.cached_mtime == m && e.cached_size == sz {
+            return Some(e.meta.clone());
+        }
+    }
+    let (title, cwd) = scan_head(p, 100, |v| {
+        let mut t = None;
+        let mut c = None;
+        if v.get("type").and_then(|x| x.as_str()) == Some("response_item") {
+            if let Some(pl) = v.get("payload") {
+                if pl.get("role").and_then(|x| x.as_str()) == Some("user") {
+                    if let Some(content) = pl.get("content") {
+                        if let Some(s) = extract_text(content) {
+                            if !s.starts_with("# AGENTS.md")
+                                && !s.starts_with("<permissions")
+                                && !s.starts_with("<user_instructions")
+                            {
+                                t = Some(truncate(&s, 120));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(pl) = v.get("payload") {
+            if let Some(s) = pl.get("cwd").and_then(|x| x.as_str()) {
+                c = Some(s.to_string());
+            }
+        }
+        (t, c)
+    });
+    Some(SessionMeta {
+        source: "codex".into(),
+        id,
+        file: key,
+        cwd,
+        title: title.unwrap_or_else(|| "(빈 세션)".into()),
+        modified_ms: m,
+        size: sz,
+    })
+}
+
+fn rebuild_index(state: &SessionIndex) {
+    let mut new_entries: HashMap<String, CacheEntry> = HashMap::new();
+    let cache = state.entries.lock().unwrap().clone();
+
+    // Claude
+    if let Ok(home) = home() {
+        let root = home.join(".claude").join("projects");
+        if let Ok(proj_dirs) = fs::read_dir(&root) {
+            for proj in proj_dirs.flatten() {
+                let proj_path = proj.path();
+                if !proj_path.is_dir() { continue; }
+                let files = match fs::read_dir(&proj_path) { Ok(d) => d, Err(_) => continue };
+                for f in files.flatten() {
+                    let p = f.path();
+                    if p.extension().and_then(|e| e.to_str()) != Some("jsonl") { continue; }
+                    if let Some(meta) = scan_one_claude(&p, &cache) {
+                        let (m, sz) = (meta.modified_ms, meta.size);
+                        new_entries.insert(meta.file.clone(), CacheEntry {
+                            meta, cached_mtime: m, cached_size: sz,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Codex
+    if let Ok(home) = home() {
+        let root = home.join(".codex").join("sessions");
+        if root.exists() {
+            let mut files: Vec<PathBuf> = Vec::new();
+            walk_codex(&root, 0, &mut files);
+            for p in files {
+                if let Some(meta) = scan_one_codex(&p, &cache) {
+                    let (m, sz) = (meta.modified_ms, meta.size);
+                    new_entries.insert(meta.file.clone(), CacheEntry {
+                        meta, cached_mtime: m, cached_size: sz,
+                    });
+                }
+            }
+        }
+    }
+
+    *state.entries.lock().unwrap() = new_entries;
+    *state.last_scan_ms.lock().unwrap() = std::time::SystemTime::now()
+        .duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0);
+}
+
+/// 앱 시작 시 호출 — 초기 스캔 + 30초마다 백그라운드 증분 갱신
+pub fn start_indexer(app: tauri::AppHandle) {
+    use tauri::Manager;
+    std::thread::spawn(move || {
+        loop {
+            if let Some(state) = app.try_state::<SessionIndex>() {
+                rebuild_index(&state);
+            }
+            std::thread::sleep(Duration::from_secs(30));
+        }
+    });
+}
+
 // ────────────────────── Tauri commands ──────────────────────
 
+#[derive(Deserialize)]
+pub struct ListArgs {
+    pub source: String,
+}
+
 #[tauri::command]
-pub fn sessions_list(source: String) -> Result<Vec<SessionMeta>, String> {
-    let mut out: Vec<SessionMeta> = Vec::new();
-    match source.as_str() {
-        "claude" => list_claude(&mut out)?,
-        "codex" => list_codex(&mut out)?,
-        "all" => {
-            list_claude(&mut out)?;
-            list_codex(&mut out)?;
-        }
-        other => return Err(format!("알 수 없는 source: {}", other)),
+pub fn sessions_list(
+    state: tauri::State<'_, SessionIndex>,
+    source: String,
+) -> Result<Vec<SessionMeta>, String> {
+    let last = *state.last_scan_ms.lock().unwrap();
+    // 캐시 콜드 — 즉시 한 번 스캔 후 반환 (이후엔 백그라운드 갱신만 필요)
+    if last == 0 {
+        rebuild_index(&state);
     }
+    let entries = state.entries.lock().unwrap();
+    let mut out: Vec<SessionMeta> = entries
+        .values()
+        .filter(|e| match source.as_str() {
+            "claude" => e.meta.source == "claude",
+            "codex"  => e.meta.source == "codex",
+            "all"    => true,
+            _        => false,
+        })
+        .map(|e| e.meta.clone())
+        .collect();
     out.sort_by(|a, b| b.modified_ms.cmp(&a.modified_ms));
     Ok(out)
+}
+
+/// 강제 재인덱싱 (UI 새로고침 버튼용)
+#[tauri::command]
+pub fn sessions_refresh(state: tauri::State<'_, SessionIndex>) -> Result<usize, String> {
+    rebuild_index(&state);
+    Ok(state.entries.lock().unwrap().len())
 }
 
 #[tauri::command]
@@ -364,3 +554,6 @@ pub fn session_load(source: String, file: String) -> Result<Vec<SessionMsg>, Str
         other => Err(format!("알 수 없는 source: {}", other)),
     }
 }
+
+#[allow(dead_code)]
+fn _suppress_unused(_a: ListArgs) {}

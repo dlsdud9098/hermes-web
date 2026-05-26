@@ -2,7 +2,7 @@
 // 탭으로 Claude Code / Codex 분리. 클릭하면 SessionViewer 패널을 dockview 에 연다.
 
 import { useEffect, useMemo, useState } from 'react';
-import { listSessions, type SessionMeta, type SessionSource } from '../api/sessions';
+import { listSessions, refreshSessions, type SessionMeta, type SessionSource } from '../api/sessions';
 import { isTauri } from '../runtime';
 
 interface Props {
@@ -79,13 +79,27 @@ export function SessionBrowser({ onClose, onOpen }: Props) {
           ))}
         </div>
 
-        <input
-          className="sessions-search"
-          placeholder="제목·경로 검색…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          autoFocus
-        />
+        <div style={{ display: 'flex', gap: 6, padding: '0 12px 8px' }}>
+          <input
+            className="sessions-search"
+            style={{ flex: 1, margin: 0 }}
+            placeholder="제목·경로 검색… (캐시된 인덱스)"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus
+          />
+          <button
+            className="btn btn-ghost"
+            onClick={async () => {
+              await refreshSessions();
+              const next = await listSessions(source);
+              setItems(next);
+            }}
+            title="디스크 재스캔"
+          >
+            ↻
+          </button>
+        </div>
 
         {error && <div className="chat-error">⚠ {error}</div>}
         {loading && <div className="fileviewer-note">로딩…</div>}

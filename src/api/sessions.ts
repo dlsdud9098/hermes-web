@@ -27,6 +27,12 @@ export async function listSessions(source: SessionSource): Promise<SessionMeta[]
   return invoke<SessionMeta[]>('sessions_list', { source });
 }
 
+/** 강제 재인덱싱 — 새 세션 즉시 반영용 */
+export async function refreshSessions(): Promise<number> {
+  if (!isTauri) return 0;
+  return invoke<number>('sessions_refresh');
+}
+
 export async function loadSession(
   source: 'claude' | 'codex',
   file: string,
