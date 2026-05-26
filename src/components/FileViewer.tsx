@@ -50,8 +50,6 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
-  /** 자동 tail — 로그 파일처럼 파일이 커지면 끝으로 자동 스크롤 */
-  const [follow, setFollow] = useState(false);
   const saveTimer = useRef<number | null>(null);
   const viewRef = useRef<EditorView | null>(null);
 
@@ -63,34 +61,48 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [filePath]);
 
-  // tail follow — 1초마다 readFile 재호출. 새 내용이 있으면 갱신 + 맨 끝 스크롤
+  // VSCode 식 자동 따라가기 — 파일 변화 항상 감지.
+  // 사용자가 스크롤을 끝에 두면 새 내용을 받아서 끝으로 따라감.
+  // 위로 스크롤해 보고 있으면 위치 유지 (자동 점프 안 함).
   useEffect(() => {
-    if (!follow) return;
     let cancelled = false;
+    const SCROLL_BOTTOM_THRESHOLD = 8; // px — 스크롤이 끝에서 8px 이내면 '끝' 으로 간주
     const tick = async () => {
       if (cancelled) return;
       try {
         const fresh = await readFile(filePath);
-        if (cancelled) return;
-        if (!data || fresh.content !== data.content) {
+        if (cancelled || !data) return;
+        if (fresh.content === data.content) return;
+        // 사용자가 dirty 면(편집 중) 디스크 변화 덮어쓰지 않음
+        if (draft !== data.content) {
           setData(fresh);
-          // 사용자가 편집 중이 아니면 (=dirty 아닐 때) draft 도 갱신
-          setDraft((cur) => (cur === (data?.content ?? '') ? fresh.content : cur));
-          const view = viewRef.current;
-          if (view) {
-            view.dispatch({
-              selection: { anchor: view.state.doc.length },
+          return;
+        }
+        const view = viewRef.current;
+        const sc = view?.scrollDOM;
+        const atBottom = sc
+          ? sc.scrollHeight - sc.scrollTop - sc.clientHeight <= SCROLL_BOTTOM_THRESHOLD
+          : false;
+        setData(fresh);
+        setDraft(fresh.content);
+        if (atBottom && view) {
+          // 다음 프레임에 끝으로 — 컨텐츠 반영 후 스크롤
+          requestAnimationFrame(() => {
+            const v = viewRef.current;
+            if (!v) return;
+            v.dispatch({
+              selection: { anchor: v.state.doc.length },
               scrollIntoView: true,
             });
-          }
+          });
         }
       } catch {
-        // 일회 실패는 무시 (파일 회전 등)
+        // 파일 회전/일시 사라짐 등 — 다음 tick 에 재시도
       }
     };
-    const handle = window.setInterval(() => { void tick(); }, 1000);
+    const handle = window.setInterval(() => { void tick(); }, 1500);
     return () => { cancelled = true; window.clearInterval(handle); };
-  }, [follow, filePath, data]);
+  }, [filePath, data, draft]);
 
   const ext = extOf(filePath);
   const isMarkdown = ext === 'md' || ext === 'markdown';
@@ -188,26 +200,21 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
         }
       }}
     >
-      <div className="fileviewer-bar">
-        {dirty && <span className="fileviewer-dirty">● 저장 안 됨</span>}
-        {isPreviewable && (
-          <button className="btn btn-ghost" onClick={openPreview} title="Ctrl+P">
-            👁 프리뷰
-          </button>
-        )}
-        <button
-          className={`btn btn-ghost${follow ? ' btn-active' : ''}`}
-          onClick={() => setFollow((v) => !v)}
-          title="1초마다 파일 재읽기 + 끝으로 자동 스크롤 (로그 파일용)"
-        >
-          {follow ? '⏬ Tail 중' : '⏬ Tail'}
-        </button>
-        {dirty && (
-          <button className="btn" disabled={saving} onClick={() => void save()}>
-            {saving ? '저장 중…' : '저장 (Ctrl+S)'}
-          </button>
-        )}
-      </div>
+      {(dirty || isPreviewable) && (
+        <div className="fileviewer-bar">
+          {dirty && <span className="fileviewer-dirty">● 저장 안 됨</span>}
+          {isPreviewable && (
+            <button className="btn btn-ghost" onClick={openPreview} title="Ctrl+P">
+              👁 프리뷰
+            </button>
+          )}
+          {dirty && (
+            <button className="btn" disabled={saving} onClick={() => void save()}>
+              {saving ? '저장 중…' : '저장 (Ctrl+S)'}
+            </button>
+          )}
+        </div>
+      )}
 
       {error && <div className="chat-error">⚠ {error}</div>}
       {data?.truncated && (

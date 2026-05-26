@@ -1252,3 +1252,47 @@
   border-color: var(--accent) !important;
   background: rgba(122, 162, 247, 0.15);
 }
+
+/* 패널 탭 우클릭 메뉴 */
+.tab { position: relative; }
+.paneltab-menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 180px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  padding: 4px;
+  font-size: 12px;
+}
+.paneltab-menu-head {
+  padding: 4px 8px;
+  color: var(--text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.paneltab-menu-empty {
+  padding: 6px 8px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.paneltab-menu-item {
+  display: block;
+  width: 100%;
+  padding: 5px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.paneltab-menu-item:hover {
+  background: var(--bg-bar);
+  color: var(--accent);
+}

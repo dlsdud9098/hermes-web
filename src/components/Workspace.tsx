@@ -3,7 +3,7 @@
 //   본문: 활성 탭의 dockview — 안에서 panel 들을 자유 분할 (pane).
 // 탭 닫기 = 그 탭의 모든 panel 사라짐.
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   DockviewReact,
   type DockviewApi,
@@ -28,6 +28,25 @@ interface ChatParams { projectId: string }
 interface ViewerParams { filePath: string }
 interface SessionViewerParams { source: 'claude' | 'codex'; file: string }
 interface SearchParams { projectPath: string }
+
+/** 탭 이동 대기열 — 탭 전환 후 새 dockview onReady 가 적용 */
+interface PendingPanel {
+  panelId: string;
+  component: string;
+  title: string;
+  params: Record<string, unknown>;
+}
+const pendingMoves = new Map<string, PendingPanel[]>();
+function pushPending(tabId: string, p: PendingPanel) {
+  const arr = pendingMoves.get(tabId) ?? [];
+  arr.push(p);
+  pendingMoves.set(tabId, arr);
+}
+function drainPending(tabId: string): PendingPanel[] {
+  const arr = pendingMoves.get(tabId) ?? [];
+  pendingMoves.delete(tabId);
+  return arr;
+}
 
 function emitOpenFile(filePath: string, line: number) {
   window.dispatchEvent(new CustomEvent('hermes:open-file', {
@@ -67,6 +86,26 @@ interface WorkspaceProps {
 
 export function Workspace({ project, onApiReady }: WorkspaceProps) {
   const { saveLayout, addTab, closeTab, setActiveTab, renameTab } = useProjects();
+  // 'hermes:move-panel-to-tab' 이벤트 처리 — 패널 ↔ 탭 이동
+  useEffect(() => {
+    function onMove(e: Event) {
+      const api = apiRef.current;
+      if (!api) return;
+      const ce = e as CustomEvent<{
+        panelId: string; title: string; params: Record<string, unknown>; targetTabId: string;
+      }>;
+      const { panelId, title, params, targetTabId } = ce.detail;
+      const panel = api.panels.find((p) => p.api.id === panelId);
+      if (!panel) return;
+      const component = panel.view.contentComponent;
+      pushPending(targetTabId, { panelId, component, title, params });
+      panel.api.close();
+      // 약간 지연 후 탭 전환 — close 가 layout 갱신을 트리거하므로
+      setTimeout(() => setActiveTab(project.id, targetTabId), 0);
+    }
+    window.addEventListener('hermes:move-panel-to-tab', onMove);
+    return () => window.removeEventListener('hermes:move-panel-to-tab', onMove);
+  }, [project.id, setActiveTab]);
   const { settings } = useSettings();
   const apiRef = useRef<DockviewApi | null>(null);
   const counterRef = useRef(1);
@@ -99,6 +138,21 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
       }
     } else {
       seed(event.api);
+    }
+
+    // 다른 탭에서 이동해온 대기 패널 추가
+    const pending = drainPending(activeTab.id);
+    for (const p of pending) {
+      try {
+        event.api.addPanel({
+          id: p.panelId,
+          component: p.component,
+          title: p.title,
+          params: p.params,
+        });
+      } catch {
+        // 중복 id 등 — skip
+      }
     }
 
     counterRef.current = event.api.panels.length + 1;

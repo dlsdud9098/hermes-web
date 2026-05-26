@@ -89,7 +89,8 @@ fn fs_list(path: Option<String>) -> Result<DirListing, String> {
 /// 파일 읽기 — 최대 256KB.
 #[tauri::command]
 fn fs_read(path: String) -> Result<FileContent, String> {
-    const MAX: u64 = 256 * 1024;
+    // 50MB — 사실상 어떤 텍스트 파일도 다 읽힘 (50MB 이상 = 데이터덤프, 별도 도구 권장).
+    const MAX: u64 = 50 * 1024 * 1024;
     let p = PathBuf::from(&path);
     let meta = fs::metadata(&p).map_err(|e| e.to_string())?;
     if !meta.is_file() {
