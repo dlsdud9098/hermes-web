@@ -8,6 +8,8 @@ export interface ToolCall {
   status: 'running' | 'done' | 'error';
   /** 완료까지 걸린 초 */
   duration?: number;
+  /** Claude Code tool_use id (tool_result 와 매칭) */
+  id?: string;
 }
 
 export interface ChatMessage {
@@ -19,6 +21,8 @@ export interface ChatMessage {
   usage?: { input: number; output: number };
   /** assistant 턴 소요 시간 (ms) */
   durationMs?: number;
+  /** 스트리밍 진행 중 (Claude Code 패널) */
+  streaming?: boolean;
 }
 
 export interface Project {

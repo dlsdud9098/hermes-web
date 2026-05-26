@@ -212,8 +212,20 @@ pub fn run() {
             claude_cli::claude_start,
             claude_cli::claude_send,
             claude_cli::claude_stop,
+            claude_cli::claude_stop_all,
             claude_cli::claude_check,
         ])
+        .on_window_event(|window, event| {
+            // 창 닫히면 모든 Claude PTY 세션 일괄 정리 — 좀비 프로세스 방지
+            use tauri::Manager;
+            if let tauri::WindowEvent::Destroyed = event {
+                if let Some(sessions) =
+                    window.try_state::<claude_cli::ClaudeSessions>()
+                {
+                    claude_cli::kill_all(&sessions);
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("Tauri 앱 실행 실패");
 }

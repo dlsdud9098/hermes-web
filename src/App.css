@@ -844,3 +844,12 @@
   padding: 0;
   border-radius: 2px;
 }
+
+/* Claude Code 패널 — 슬래시 명령 힌트 */
+.chat-hint {
+  padding: 4px 10px;
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--bg-bar);
+  border-bottom: 1px solid var(--border);
+}
