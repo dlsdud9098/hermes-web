@@ -5,9 +5,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
-import { EditorView } from '@codemirror/view';
+import { EditorView, keymap } from '@codemirror/view';
 import { EditorState, type Extension } from '@codemirror/state';
 import { indentUnit } from '@codemirror/language';
+import { search, searchKeymap, openSearchPanel } from '@codemirror/search';
 import { markdown } from '@codemirror/lang-markdown';
 import { GFM } from '@lezer/markdown';
 import {
@@ -50,6 +51,7 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
   const saveTimer = useRef<number | null>(null);
+  const viewRef = useRef<EditorView | null>(null);
 
   useEffect(() => {
     setError(null);
@@ -80,6 +82,8 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
       EditorState.tabSize.of(settings.tabSize),
       indentUnit.of(' '.repeat(settings.tabSize)),
       EditorView.theme({ '&': { fontSize: `${settings.codeFontSize}px` } }),
+      search({ top: true }),
+      keymap.of(searchKeymap),
     ];
     if (settings.wordWrap || isMarkdown) list.push(EditorView.lineWrapping);
     if (isMarkdown) {
@@ -134,6 +138,22 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
         if ((e.ctrlKey || e.metaKey) && e.key === 's') {
           e.preventDefault();
           void save();
+          return;
+        }
+        // CodeMirror 에디터 안에 포커스가 있을 때 Ctrl+F/Ctrl+H 가로채서
+        // 전역 검색이 아닌 파일 내 검색 패널을 연다.
+        const target = e.target as HTMLElement | null;
+        const inEditor = !!target?.closest('.cm-editor');
+        if (inEditor && (e.ctrlKey || e.metaKey) && !e.altKey) {
+          const key = e.key.toLowerCase();
+          if (key === 'f' || key === 'h') {
+            const view = viewRef.current;
+            if (view) {
+              e.preventDefault();
+              e.stopPropagation();
+              openSearchPanel(view);
+            }
+          }
         }
       }}
     >
@@ -168,6 +188,7 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
             extensions={extensions}
             editable={!data.truncated}
             onChange={setDraft}
+            onCreateEditor={(view) => { viewRef.current = view; }}
             basicSetup={{
               lineNumbers: settings.lineNumbers,
               foldGutter: settings.lineNumbers,

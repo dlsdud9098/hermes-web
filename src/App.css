@@ -1005,3 +1005,52 @@
   cursor: pointer;
 }
 .tabbar-add:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ────────────── CodeMirror 파일 내 검색 패널 ────────────── */
+.cm-panels.cm-panels-top { border-bottom: 1px solid var(--border); }
+.cm-search.cm-panel {
+  background: var(--bg-panel);
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  padding: 6px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  font-size: 12px;
+}
+.cm-search input,
+.cm-search input[type="text"],
+.cm-search input[type="search"] {
+  background: var(--bg, #fff);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  outline: none;
+}
+.cm-search input:focus { border-color: var(--accent); }
+.cm-search button {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.cm-search button:hover { border-color: var(--accent); color: var(--accent); }
+.cm-search label {
+  color: var(--text);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.cm-search label input[type="checkbox"] { accent-color: var(--accent); }
+.cm-search [name="close"] {
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+}
