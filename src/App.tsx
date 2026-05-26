@@ -12,7 +12,8 @@ import { useSettings } from './store/settings';
 import './App.css';
 
 function Shell() {
-  const { projects, activeId, openProject, setActive, addTab, closeTab } = useProjects();
+  const { projects, activeId, openProject, setActive,
+          addTab, closeTab, setActiveTab } = useProjects();
   const { settings } = useSettings();
   const active = projects.find((p) => p.id === activeId) ?? projects[0];
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -141,8 +142,19 @@ function Shell() {
       const p = projects[i - 1];
       if (p) setActive(p.id);
     },
+    switchTab: (i: number) => {
+      if (!active) return;
+      const t = active.tabs[i - 1];
+      if (t) setActiveTab(active.id, t.id);
+    },
+    switchPanel: (i: number) => {
+      const api = dockApiRef.current;
+      const p = api?.panels[i - 1];
+      if (p) p.api.setActive();
+    },
   }), [newTab, splitPanel, closeActiveTab, closeActivePanel, openFolderPicker,
-       previewActive, openSearchPanel, projects, setActive]);
+       previewActive, openSearchPanel, projects, setActive,
+       active, setActiveTab]);
 
   useGlobalShortcuts(shortcuts, settings.keymap);
 

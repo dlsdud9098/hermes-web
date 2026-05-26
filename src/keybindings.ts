@@ -33,8 +33,12 @@ export interface Shortcuts {
   previewActive: () => void;
   openSearch: () => void;
   openSessions: () => void;
-  /** index = 1..9 → 해당 프로젝트 전환 (Ctrl+1..9 고정, 사용자 정의 불가) */
+  /** Ctrl+Alt+1..9 — 프로젝트 전환 */
   switchProject: (index: number) => void;
+  /** Ctrl+1..9 — 현재 프로젝트의 N번째 탭 전환 */
+  switchTab: (index: number) => void;
+  /** Ctrl+Shift+1..9 — 현재 탭 dockview 의 N번째 패널 활성화 */
+  switchPanel: (index: number) => void;
 }
 
 export interface ActionSpec {
@@ -106,10 +110,14 @@ export function useGlobalShortcuts(
 ): void {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      // Ctrl+1..9 → 프로젝트 전환 (고정)
-      if ((e.ctrlKey || e.metaKey) && /^[1-9]$/.test(e.key)) {
+      const mod = e.ctrlKey || e.metaKey;
+      // Ctrl+(Shift|Alt)+1..9 — 고정 단축키 (사용자 정의 불가)
+      if (mod && /^[1-9]$/.test(e.key)) {
+        const n = parseInt(e.key, 10);
         e.preventDefault();
-        s.switchProject(parseInt(e.key, 10));
+        if (e.altKey) s.switchProject(n);
+        else if (e.shiftKey) s.switchPanel(n);
+        else s.switchTab(n);
         return;
       }
 
