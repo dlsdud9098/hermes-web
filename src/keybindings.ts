@@ -6,7 +6,8 @@ import { useEffect } from 'react';
 
 export type ShortcutAction =
   | 'newSessionTab'
-  | 'newSessionSplit'
+  | 'newSessionSplitH'
+  | 'newSessionSplitV'
   | 'closeActivePanel'
   | 'openSettings'
   | 'openFolder'
@@ -17,7 +18,10 @@ export type ShortcutAction =
 
 export interface Shortcuts {
   newSessionTab: () => void;
-  newSessionSplit: () => void;
+  /** 가로 분할 — 오른쪽 */
+  newSessionSplitH: () => void;
+  /** 세로 분할 — 아래쪽 */
+  newSessionSplitV: () => void;
   closeActivePanel: () => void;
   openSettings: () => void;
   openFolder: () => void;
@@ -38,8 +42,9 @@ export interface ActionSpec {
 
 /** 사용자에게 노출하는 액션 목록. 표시 순서 = 정의 순서 */
 export const ACTIONS: readonly ActionSpec[] = [
-  { id: 'newSessionTab',    label: '새 세션 탭',         allowEditing: false },
-  { id: 'newSessionSplit',  label: '새 세션 분할',       allowEditing: false },
+  { id: 'newSessionTab',     label: '새 세션 탭',           allowEditing: false },
+  { id: 'newSessionSplitH',  label: '새 세션 가로 분할(↔)', allowEditing: false },
+  { id: 'newSessionSplitV',  label: '새 세션 세로 분할(↕)', allowEditing: false },
   { id: 'closeActivePanel', label: '활성 패널 닫기',     allowEditing: false },
   { id: 'previewActive',    label: '활성 HTML 프리뷰',   allowEditing: false },
   { id: 'openSearch',       label: '프로젝트 전체 검색', allowEditing: true  },
@@ -50,9 +55,10 @@ export const ACTIONS: readonly ActionSpec[] = [
 ];
 
 export const DEFAULT_KEYMAP: Record<ShortcutAction, string> = {
-  newSessionTab:    'Ctrl+N',
-  newSessionSplit:  'Ctrl+Shift+N',
-  closeActivePanel: 'Ctrl+W',
+  newSessionTab:     'Ctrl+N',
+  newSessionSplitH:  'Ctrl+Shift+N',
+  newSessionSplitV:  'Ctrl+Alt+N',
+  closeActivePanel:  'Ctrl+W',
   openSettings:     'Ctrl+,',
   openFolder:       'Ctrl+O',
   toggleFileTree:   'Ctrl+B',

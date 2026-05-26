@@ -95,9 +95,8 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
     event.api.onDidAddPanel((panel) => panel.api.onDidTitleChange(persist));
   }, [project.id, project.layout, saveLayout, seed, onApiReady]);
 
-  // mode 'tab' → 활성 그룹에 탭으로 추가 / 'split' → 오른쪽으로 세로 분할
-  // 백엔드는 설정의 chatProvider 가 결정 — 여기서는 그것만 따른다
-  const addSession = useCallback((mode: 'tab' | 'split') => {
+  // mode: 'tab' = 같은 그룹에 탭 추가 / 'right' = 가로 분할 / 'below' = 세로 분할
+  const addSession = useCallback((mode: 'tab' | 'right' | 'below') => {
     const api = apiRef.current;
     if (!api) return;
     const isClaude = settings.chatProvider === 'claude';
@@ -106,9 +105,9 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
       component: isClaude ? 'claudecode' : 'chat',
       title: `${isClaude ? 'Claude' : '세션'} ${counterRef.current++}`,
       params: { projectId: project.id },
-      ...(mode === 'split'
-        ? { position: { direction: 'right' as const } }
-        : {}),
+      ...(mode === 'tab'
+        ? {}
+        : { position: { direction: mode as 'right' | 'below' } }),
     });
   }, [project.id, settings.chatProvider]);
 
@@ -119,11 +118,17 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
           {project.name}
         </span>
         <div className="workspace-actions">
-          <button className="btn btn-ghost" onClick={() => addSession('tab')}>
+          <button className="btn btn-ghost" onClick={() => addSession('tab')}
+            title="활성 그룹에 새 탭">
             + 탭
           </button>
-          <button className="btn btn-ghost" onClick={() => addSession('split')}>
-            + 분할
+          <button className="btn btn-ghost" onClick={() => addSession('right')}
+            title="오른쪽으로 가로 분할">
+            ↔ 분할
+          </button>
+          <button className="btn btn-ghost" onClick={() => addSession('below')}
+            title="아래쪽으로 세로 분할">
+            ↕ 분할
           </button>
         </div>
       </div>

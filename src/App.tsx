@@ -80,7 +80,7 @@ function Shell() {
 
   const openFolderPicker = useCallback(() => setPickerOpen(true), []);
 
-  const newSessionTab = useCallback(() => {
+  const addSession = useCallback((mode: 'tab' | 'right' | 'below') => {
     const api = dockApiRef.current;
     if (!api || !active) return;
     const isClaude = settings.chatProvider === 'claude';
@@ -89,19 +89,7 @@ function Shell() {
       component: isClaude ? 'claudecode' : 'chat',
       title: `${isClaude ? 'Claude' : '세션'} ${api.panels.length + 1}`,
       params: { projectId: active.id },
-    });
-  }, [active, settings.chatProvider]);
-
-  const newSessionSplit = useCallback(() => {
-    const api = dockApiRef.current;
-    if (!api || !active) return;
-    const isClaude = settings.chatProvider === 'claude';
-    api.addPanel({
-      id: uid('panel'),
-      component: isClaude ? 'claudecode' : 'chat',
-      title: `${isClaude ? 'Claude' : '세션'} ${api.panels.length + 1}`,
-      params: { projectId: active.id },
-      position: { direction: 'right' as const },
+      ...(mode === 'tab' ? {} : { position: { direction: mode } }),
     });
   }, [active, settings.chatProvider]);
 
@@ -124,8 +112,9 @@ function Shell() {
   }, []);
 
   const shortcuts = useMemo(() => ({
-    newSessionTab,
-    newSessionSplit,
+    newSessionTab: () => addSession('tab'),
+    newSessionSplitH: () => addSession('right'),
+    newSessionSplitV: () => addSession('below'),
     closeActivePanel,
     openSettings: () => setSettingsOpen(true),
     openFolder: openFolderPicker,
@@ -137,7 +126,7 @@ function Shell() {
       const p = projects[i - 1];
       if (p) setActive(p.id);
     },
-  }), [newSessionTab, newSessionSplit, closeActivePanel, openFolderPicker,
+  }), [addSession, closeActivePanel, openFolderPicker,
        previewActive, openSearchPanel, projects, setActive]);
 
   useGlobalShortcuts(shortcuts, settings.keymap);
