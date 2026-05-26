@@ -55,13 +55,15 @@ export function StatusBar({ panelCount }: StatusBarProps) {
         {settings.chatProvider === 'claude' ? 'Claude' : 'Hermes'}
       </span>
       <span className="statusbar-spacer" />
-      <span className="statusbar-item" title={claudeTitle}>
-        <span
-          className="statusbar-dot"
-          style={{ background: ok ? '#9ece6a' : '#f7768e' }}
-        />
-        claude
-      </span>
+      {settings.chatProvider === 'claude' && (
+        <span className="statusbar-item" title={claudeTitle}>
+          <span
+            className="statusbar-dot"
+            style={{ background: ok ? '#9ece6a' : '#f7768e' }}
+          />
+          Claude CLI
+        </span>
+      )}
     </div>
   );
 }
