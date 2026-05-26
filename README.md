@@ -1,10 +1,41 @@
 # hermes-web
 
-[Hermes Agent](https://github.com/NousResearch/hermes-agent) 및 [Claude Code](https://claude.com/code) 를
-한 화면에서 다루는 데스크톱 워크스페이스. cmux/tmux 식 **탭 + 패널 분할** 모델,
-프로젝트 단위 작업 폴더 바인딩, 외부 에이전트 세션 기록 통합 뷰어.
+> **Claude Code + OpenAI Codex + Hermes Agent 한 화면 데스크톱 GUI.**
+> Max 구독으로 Claude Code 멀티 세션, ChatGPT Plus/Pro 로 Codex 같이 — cmux 식 **탭 + 분할 패널** 자유 배치. Claude Max **5시간/7일 quota 실시간** 표시. 파일트리·프로젝트 전체 검색·세션 기록 통합 뷰어·인앱 브라우저·명령 팔레트.
 
-> Tauri v2 네이티브 앱 — Win/Mac/Linux. 시스템 웹뷰 + Rust 백엔드. Electron 대비 ~30배 경량.
+![Cross-platform](https://img.shields.io/badge/Win%20%7C%20Mac%20%7C%20Linux-supported-success) ![License](https://img.shields.io/badge/license-MIT-green) ![GUI](https://img.shields.io/badge/Claude%20Code-Desktop%20GUI-blueviolet) ![Codex](https://img.shields.io/badge/Codex-ChatGPT%20Plus%2FPro-10a37f) ![Max Monitor](https://img.shields.io/badge/Claude%20Max-5h%2F7d%20quota-orange)
+
+## 누가 이걸 찾는가
+
+- **Claude Code 사용자**: TUI 한 세션만 굴리기 답답하다. **탭/분할로 멀티 세션** 원함. 5h/7d quota 모니터링 필요
+- **Codex 사용자**: ChatGPT Plus/Pro 구독으로 코딩 에이전트 쓰고 싶다. CLI 만 있는데 **데스크톱 GUI** 원함
+- **둘 다 쓰는 사용자**: 같은 프로젝트에서 Claude 와 Codex 의견 비교, 같은 화면에서
+- **Hermes Agent 셀프호스트 사용자**: 자체 게이트웨이의 웹 UI 필요
+- **한국어 사용자**: Korean LLM 워크플로우, 한글 UI
+
+## 비교
+
+| | 우리 (hermes-web) | Claude Desktop | Cursor | cmux | VSCode + Cline |
+|---|---|---|---|---|---|
+| Claude Code 멀티 세션 (탭+분할) | ✓ | ✗ (1세션) | ✗ | ✓ | ✗ |
+| Codex 동시 (ChatGPT Plus/Pro) | ✓ | ✗ | ✗ | ✗ | ✗ |
+| Hermes Agent 통합 | ✓ | ✗ | ✗ | ✗ | ✗ |
+| Max 5h/7d quota 실시간 | ✓ | ✗ | N/A | ✗ | ✗ |
+| 외부 세션 JSONL 통합 뷰어 | ✓ | ✗ | ✗ | ✗ | ✗ |
+| 데스크톱 네이티브 (Electron 아님) | ✓ Tauri | ✗ Electron | ✗ Electron | ✓ | ✗ |
+
+## 검색 키워드 (사용자 의도)
+
+- "Claude Code GUI / 데스크톱 클라이언트"
+- "Claude Code 멀티 세션 / 탭 / 분할"
+- "Claude Max 사용량 모니터 / 5시간 한도 / 7일 한도"
+- "Codex GUI / 데스크톱 / ChatGPT Plus 코딩"
+- "ChatGPT Codex API 키 없이"
+- "AI coding agent 멀티 윈도우"
+- "claude code codex 같이 사용"
+- "cmux alternative"
+
+---
 
 ---
 

@@ -1,5 +1,20 @@
 {
   "name": "hermes-web",
+  "description": "Tauri 데스크톱 멀티 에이전트 IDE — Hermes Agent / Claude Code / Codex CLI 통합. cmux식 탭+분할 패널, 파일트리, 프로젝트 검색, 세션 인덱서, 구독 quota 표시, 인앱 브라우저, 명령 팔레트, 테마 프리셋.",
+  "keywords": [
+    "claude-code-gui", "claude-code-desktop", "claude-code-tabs",
+    "claude-max-monitor", "claude-quota", "claude-usage-tracker",
+    "codex-gui", "codex-desktop", "chatgpt-plus-codex",
+    "ai-coding-agent", "ai-coding-ide", "multi-agent-workspace",
+    "ai-workspace", "agent-ui",
+    "claude-code", "codex", "hermes-agent", "cmux", "openchrome",
+    "korean"
+  ],
+  "homepage": "https://github.com/dlsdud9098/hermes-web",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dlsdud9098/hermes-web.git"
+  },
   "private": true,
   "version": "0.0.0",
   "type": "module",
