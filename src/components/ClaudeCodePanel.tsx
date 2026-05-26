@@ -9,19 +9,23 @@
 // 패널 unmount 시 PTY 자동 종료(claude_stop). 같은 프로세스 그룹 SIGKILL 로
 // claude 가 띄운 도구 서브프로세스까지 일괄 정리.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   claudeStart, claudeSend, claudeStop, claudeCheck,
   onClaudeDelta, onClaudeToolStart, onClaudeToolEnd, onClaudeTurnEnd,
   type ClaudeStatus,
 } from '../api/claudeCli';
+import { listSkills, type Skill } from '../api/skills';
 import { useProjects } from '../store/projects';
 import { useSettings } from '../store/settings';
 import { Markdown } from './Markdown';
 import { ToolCard } from './ToolCard';
 import { CopyButton } from './CopyButton';
+import { SkillMenu } from './SkillMenu';
 import type { ChatMessage, ToolCall } from '../types';
 import type { UnlistenFn } from '@tauri-apps/api/event';
+
+const MAX_SKILL_RESULTS = 60;
 
 interface Props {
   panelId: string;
@@ -43,7 +47,32 @@ export function ClaudeCodePanel({ panelId, projectId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<ClaudeStatus | null>(null);
   const [started, setStarted] = useState(false);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [skillIdx, setSkillIdx] = useState(0);
+  const [menuDismissed, setMenuDismissed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    listSkills('claude').then(setSkills).catch(() => { /* 빈 목록 */ });
+  }, []);
+
+  const slashQuery = useMemo(() => {
+    const m = draft.match(/^\/([a-z0-9-]*)$/);
+    return m ? m[1] : null;
+  }, [draft]);
+
+  const filteredSkills = useMemo(() => {
+    if (slashQuery === null) return [];
+    return skills.filter((s) => s.name.includes(slashQuery)).slice(0, MAX_SKILL_RESULTS);
+  }, [skills, slashQuery]);
+
+  const menuOpen = slashQuery !== null && !menuDismissed && filteredSkills.length > 0;
+  useEffect(() => { setSkillIdx(0); }, [slashQuery]);
+
+  function pickSkill(skill: Skill) {
+    setDraft(`/${skill.name} `);
+    setMenuDismissed(false);
+  }
 
   useEffect(() => { setMessages(panelId, messages); }, [messages, panelId, setMessages]);
 
@@ -150,6 +179,15 @@ export function ClaudeCodePanel({ panelId, projectId }: Props) {
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (menuOpen) {
+      const len = filteredSkills.length;
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSkillIdx((i) => (i + 1) % len); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSkillIdx((i) => (i - 1 + len) % len); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault(); pickSkill(filteredSkills[skillIdx]); return;
+      }
+      if (e.key === 'Escape') { e.preventDefault(); setMenuDismissed(true); return; }
+    }
     if (e.key === 'Enter') {
       const shouldSend = settings.enterToSend ? !e.shiftKey : e.shiftKey;
       if (shouldSend) {
@@ -211,21 +249,26 @@ export function ClaudeCodePanel({ panelId, projectId }: Props) {
         {error && <div className="chat-error">⚠ {error}</div>}
       </div>
       <div className="chat-composer">
-        {isSlash && (
+        {menuOpen && (
+          <SkillMenu skills={filteredSkills} selectedIndex={skillIdx} onPick={pickSkill} />
+        )}
+        {isSlash && !menuOpen && (
           <div className="chat-hint">
             ⓘ 슬래시 명령은 PTY 안의 TUI 메뉴를 띄움 — UI 응답 없을 수 있음
           </div>
         )}
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder="Claude Code 메시지… (Enter 전송, Shift+Enter 줄바꿈)"
-          rows={2}
-        />
-        {streaming
-          ? <button className="btn btn-stop" disabled>실행 중…</button>
-          : <button className="btn" onClick={() => void send()} disabled={!draft.trim()}>전송</button>}
+        <div className="composer-row">
+          <textarea
+            value={draft}
+            onChange={(e) => { setDraft(e.target.value); setMenuDismissed(false); }}
+            onKeyDown={onKeyDown}
+            placeholder="Claude Code 메시지… (Enter 전송, / 스킬)"
+            rows={2}
+          />
+          {streaming
+            ? <button className="btn btn-stop" disabled>실행 중…</button>
+            : <button className="btn" onClick={() => void send()} disabled={!draft.trim()}>전송</button>}
+        </div>
       </div>
     </div>
   );

@@ -1,18 +1,22 @@
 // Codex CLI 인터랙티브 패널 — codex exec --json 매 턴 spawn.
 // 첫 턴에 thread.started 의 thread_id 캡쳐 → 이후 턴은 자동 resume.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   codexSend, codexClearSession, codexCheck, codexLoginStatus,
   onCodexDelta, onCodexToolStart, onCodexToolEnd, onCodexTurnEnd, onCodexError,
 } from '../api/codexCli';
+import { listSkills, type Skill } from '../api/skills';
 import { useProjects } from '../store/projects';
 import { useSettings } from '../store/settings';
 import { Markdown } from './Markdown';
 import { ToolCard } from './ToolCard';
 import { CopyButton } from './CopyButton';
+import { SkillMenu } from './SkillMenu';
 import type { ChatMessage, ToolCall } from '../types';
 import type { UnlistenFn } from '@tauri-apps/api/event';
+
+const MAX_SKILL_RESULTS = 60;
 
 interface Props { panelId: string; projectId: string }
 
@@ -30,7 +34,26 @@ export function CodexPanel({ panelId, projectId }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [installed, setInstalled] = useState<boolean | null>(null);
   const [loginInfo, setLoginInfo] = useState('');
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [skillIdx, setSkillIdx] = useState(0);
+  const [menuDismissed, setMenuDismissed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    listSkills('codex').then(setSkills).catch(() => {});
+  }, []);
+
+  const slashQuery = useMemo(() => {
+    const m = draft.match(/^\/([a-z0-9-]*)$/);
+    return m ? m[1] : null;
+  }, [draft]);
+  const filteredSkills = useMemo(() => {
+    if (slashQuery === null) return [];
+    return skills.filter((s) => s.name.includes(slashQuery)).slice(0, MAX_SKILL_RESULTS);
+  }, [skills, slashQuery]);
+  const menuOpen = slashQuery !== null && !menuDismissed && filteredSkills.length > 0;
+  useEffect(() => { setSkillIdx(0); }, [slashQuery]);
+  function pickSkill(s: Skill) { setDraft(`/${s.name} `); setMenuDismissed(false); }
 
   useEffect(() => { setMessages(panelId, messages); }, [messages, panelId, setMessages]);
 
@@ -120,6 +143,15 @@ export function CodexPanel({ panelId, projectId }: Props) {
   }, [draft, streaming, panelId, projectPath]);
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (menuOpen) {
+      const len = filteredSkills.length;
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSkillIdx((i) => (i + 1) % len); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSkillIdx((i) => (i - 1 + len) % len); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault(); pickSkill(filteredSkills[skillIdx]); return;
+      }
+      if (e.key === 'Escape') { e.preventDefault(); setMenuDismissed(true); return; }
+    }
     if (e.key === 'Enter') {
       const shouldSend = settings.enterToSend ? !e.shiftKey : e.shiftKey;
       if (shouldSend) { e.preventDefault(); void send(); }
@@ -173,12 +205,15 @@ export function CodexPanel({ panelId, projectId }: Props) {
         {error && <div className="chat-error">⚠ {error}</div>}
       </div>
       <div className="chat-composer">
+        {menuOpen && (
+          <SkillMenu skills={filteredSkills} selectedIndex={skillIdx} onPick={pickSkill} />
+        )}
         <div className="composer-row">
           <textarea
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => { setDraft(e.target.value); setMenuDismissed(false); }}
             onKeyDown={onKeyDown}
-            placeholder="Codex 메시지… (Enter 전송, Shift+Enter 줄바꿈)"
+            placeholder="Codex 메시지… (Enter 전송, / 슬래시)"
             rows={2}
           />
           {streaming

@@ -85,7 +85,7 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
 
   // 스킬 목록 1회 로드 (실패해도 채팅은 정상 동작)
   useEffect(() => {
-    listSkills().then(setSkills).catch(() => { /* 스킬 목록 없이 진행 */ });
+    listSkills('hermes').then(setSkills).catch(() => { /* 스킬 목록 없이 진행 */ });
   }, []);
 
   // draft 가 '/단어' 꼴이면 슬래시 쿼리, 아니면 null (공백 들어가면 닫힘)

@@ -197,6 +197,112 @@ fn fs_skills() -> Result<SkillList, String> {
     Ok(SkillList { skills: out })
 }
 
+/// 마크다운 1개 파일을 명령 1개로 — 파일명(stem) = 슬래시명, 첫 줄(#/제목)이나
+/// 프론트매터 description 을 설명으로.
+fn parse_command_md(file: &Path) -> Skill {
+    let stem = file.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
+    let mut description = String::new();
+    if let Ok(text) = fs::read_to_string(file) {
+        let head: String = text.chars().take(2000).collect();
+        // YAML frontmatter description 우선
+        if let Some(rest) = head.strip_prefix("---") {
+            if let Some(end) = rest.find("\n---") {
+                for line in rest[..end].lines() {
+                    if let Some(v) = line.trim().strip_prefix("description:") {
+                        description = v.trim().trim_matches(|c| c == '"' || c == '\'').to_string();
+                        break;
+                    }
+                }
+            }
+        }
+        // 없으면 첫 비어있지 않은 라인 (제목 또는 한 줄 요약)
+        if description.is_empty() {
+            for line in head.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with("---") { continue; }
+                description = line.trim_start_matches('#').trim().to_string();
+                break;
+            }
+        }
+    }
+    Skill { name: stem.to_lowercase().replace('_', "-"), description }
+}
+
+fn walk_commands_dir(root: &Path, out: &mut Vec<Skill>) {
+    let entries = match fs::read_dir(root) {
+        Ok(e) => e, Err(_) => return,
+    };
+    for e in entries.flatten() {
+        let path = e.path();
+        let ft = match e.file_type() { Ok(ft) => ft, Err(_) => continue };
+        if ft.is_dir() {
+            walk_commands_dir(&path, out);
+        } else if ft.is_file()
+            && path.extension().and_then(|x| x.to_str()) == Some("md")
+        {
+            out.push(parse_command_md(&path));
+        }
+    }
+}
+
+/// Claude Code builtin slash commands (필터될 일 없는 핵심만)
+fn builtin_claude_commands() -> Vec<Skill> {
+    let items = [
+        ("usage", "현재 세션 토큰 사용량 + 플랜 한도 표시"),
+        ("status", "세션 설정 + 토큰 사용량 한 줄 요약"),
+        ("clear", "현재 세션 히스토리 비우기"),
+        ("compact", "히스토리 요약·압축"),
+        ("model", "이번 세션 모델 변경"),
+        ("review", "코드 리뷰 모드"),
+        ("resume", "이전 세션 재개 (picker)"),
+        ("memory", "메모리 편집"),
+        ("agents", "에이전트 관리"),
+        ("plugins", "플러그인 관리"),
+        ("init", "프로젝트 초기화"),
+        ("doctor", "claude 설치 헬스체크"),
+    ];
+    items.into_iter().map(|(n, d)| Skill { name: n.into(), description: d.into() }).collect()
+}
+
+/// Codex builtin slash commands
+fn builtin_codex_commands() -> Vec<Skill> {
+    let items = [
+        ("status", "thread id, context 사용량, rate limit 표시"),
+        ("plan", "plan 모드 토글 (다단계 계획)"),
+        ("review", "코드 리뷰 모드 (변경분 vs base)"),
+        ("goal", "지속 목표 설정"),
+        ("mcp", "연결된 MCP 서버 상태"),
+        ("feedback", "피드백 다이얼로그"),
+    ];
+    items.into_iter().map(|(n, d)| Skill { name: n.into(), description: d.into() }).collect()
+}
+
+#[tauri::command]
+fn provider_skills(source: String) -> Result<SkillList, String> {
+    let home = dirs::home_dir().ok_or_else(|| "홈 디렉토리 미확인".to_string())?;
+    let mut out: Vec<Skill> = Vec::new();
+    match source.as_str() {
+        "hermes" => {
+            walk_skills(&home.join(".hermes").join("skills"), 0, &mut out);
+        }
+        "claude" => {
+            walk_skills(&home.join(".claude").join("skills"), 0, &mut out);
+            walk_commands_dir(&home.join(".claude").join("commands"), &mut out);
+            out.extend(builtin_claude_commands());
+        }
+        "codex" => {
+            walk_commands_dir(&home.join(".codex").join("prompts"), &mut out);
+            out.extend(builtin_codex_commands());
+        }
+        _ => return Err(format!("알 수 없는 source: {}", source)),
+    }
+    // 중복 제거 (name 기준 우선; 첫 등장 우선)
+    let mut seen = std::collections::HashSet::new();
+    out.retain(|s| seen.insert(s.name.clone()));
+    out.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(SkillList { skills: out })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -218,6 +324,7 @@ pub fn run() {
             fs_read,
             fs_write,
             fs_skills,
+            provider_skills,
             fs_walk::fs_walk,
             sessions::sessions_list,
             sessions::sessions_refresh,
