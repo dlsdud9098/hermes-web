@@ -102,21 +102,6 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
     event.api.onDidAddPanel((panel) => panel.api.onDidTitleChange(persist));
   }, [project.id, activeTab.id, activeTab.layout, saveLayout, seed, onApiReady]);
 
-  // 활성 탭 안에서 새 패널 추가 — tab/right/below
-  const addPanel = useCallback((mode: 'tab' | 'right' | 'below') => {
-    const api = apiRef.current;
-    if (!api) return;
-    const isClaude = settings.chatProvider === 'claude';
-    const title = `${isClaude ? 'Claude' : '세션'} ${counterRef.current++}`;
-    api.addPanel({
-      id: uid('panel'),
-      component: isClaude ? 'claudecode' : 'chat',
-      title,
-      params: { projectId: project.id },
-      ...(mode === 'tab' ? {} : { position: { direction: mode } }),
-    });
-  }, [project.id, settings.chatProvider]);
-
   return (
     <div className="workspace">
       <TabBar
@@ -127,21 +112,6 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
         onClose={(id) => closeTab(project.id, id)}
         onRename={(id, name) => renameTab(project.id, id, name)}
       />
-      <div className="workspace-bar">
-        <span className="workspace-title" style={{ color: project.color }} title={project.path}>
-          {project.name}
-        </span>
-        <div className="workspace-actions">
-          <button className="btn btn-ghost" onClick={() => addPanel('below')}
-            title="가로선으로 분할 — 위아래 배치">
-            ─ 가로 분할
-          </button>
-          <button className="btn btn-ghost" onClick={() => addPanel('right')}
-            title="세로선으로 분할 — 좌우 배치">
-            │ 세로 분할
-          </button>
-        </div>
-      </div>
       {/* key={activeTab.id} → 탭 전환 시 DockviewReact 완전 remount, 각 탭의 layout 복원 */}
       <DockviewReact
         key={activeTab.id}
