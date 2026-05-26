@@ -25,12 +25,20 @@ interface TreeClipboard {
   op: 'copy' | 'cut';
 }
 
+interface TreeMenuState {
+  x: number;
+  y: number;
+  items: MenuItem[];
+}
+
 interface TreeCtx {
   clipboard: TreeClipboard | null;
   setClipboard: (c: TreeClipboard | null) => void;
   /** 트리 일부 재로드 트리거 — 디렉토리 경로별 incrementing key */
   bumpReload: (dirPath: string) => void;
   reloadKey: Record<string, number>;
+  /** 전역 단일 컨텍스트 메뉴 — 새로 열면 기존 자동 대체 */
+  openMenu: (state: TreeMenuState) => void;
 }
 const TreeContext = createContext<TreeCtx | null>(null);
 
@@ -158,25 +166,25 @@ function buildMenu(opts: {
   const items: MenuItem[] = [];
   if (entry) {
     items.push(
-      { label: '📋 복사', run: () => setClipboard({ paths: [entry.path], op: 'copy' }) },
-      { label: '✂ 잘라내기', run: () => setClipboard({ paths: [entry.path], op: 'cut' }) },
+      { label: '복사', run: () => setClipboard({ paths: [entry.path], op: 'copy' }) },
+      { label: '잘라내기', run: () => setClipboard({ paths: [entry.path], op: 'cut' }) },
     );
   }
   if (clipboard) {
     items.push({
-      label: `📥 붙여넣기 (${clipboard.paths.length}개${clipboard.op === 'cut' ? ', 이동' : ''})`,
+      label: `붙여넣기 (${clipboard.paths.length}개${clipboard.op === 'cut' ? ', 이동' : ''})`,
       run: paste,
     });
   }
   if (entry) {
     items.push({ label: '', sep: true, run: () => {} });
-    items.push({ label: '✏️ 이름 변경', run: rename });
-    items.push({ label: '📎 경로 복사', run: copyPath });
-    items.push({ label: '🗑 삭제', run: remove });
+    items.push({ label: '이름 변경', run: rename });
+    items.push({ label: '경로 복사', run: copyPath });
+    items.push({ label: '삭제', run: remove });
   }
   items.push({ label: '', sep: true, run: () => {} });
-  items.push({ label: '+ 새 파일', run: newFile });
-  items.push({ label: '+ 새 폴더', run: newFolder });
+  items.push({ label: '새 파일', run: newFile });
+  items.push({ label: '새 폴더', run: newFolder });
   return items;
 }
 
@@ -193,7 +201,6 @@ function DirNode({ entry, depth, onOpenFile, parentDir }: DirNodeProps) {
   const [open, setOpen] = useState(false);
   const [listing, setListing] = useState<DirListing | null>(null);
   const [error, setError] = useState(false);
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -225,7 +232,16 @@ function DirNode({ entry, depth, onOpenFile, parentDir }: DirNodeProps) {
     e.preventDefault();
     e.stopPropagation();
     if (!isTauri) return;
-    setMenu({ x: e.clientX, y: e.clientY });
+    tree.openMenu({
+      x: e.clientX, y: e.clientY,
+      items: buildMenu({
+        entry, isDir: true, parentDir,
+        clipboard: tree.clipboard,
+        setClipboard: tree.setClipboard,
+        reload: () => { void reload(); tree.bumpReload(entry.path); },
+        reloadParent: () => tree.bumpReload(parentDir),
+      }),
+    });
   }
 
   const pad = depth * 12 + 8;
@@ -252,19 +268,6 @@ function DirNode({ entry, depth, onOpenFile, parentDir }: DirNodeProps) {
           ))}
         </>
       )}
-      {menu && (
-        <CtxMenu
-          x={menu.x} y={menu.y}
-          items={buildMenu({
-            entry, isDir: true, parentDir,
-            clipboard: tree.clipboard,
-            setClipboard: tree.setClipboard,
-            reload: () => { void reload(); tree.bumpReload(entry.path); },
-            reloadParent: () => tree.bumpReload(parentDir),
-          })}
-          onClose={() => setMenu(null)}
-        />
-      )}
     </>
   );
 }
@@ -274,40 +277,33 @@ function FileRow({ entry, depth, onOpenFile, parentDir }: {
   onOpenFile: (f: DirEntry) => void; parentDir: string;
 }) {
   const tree = useTree();
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   function onCtx(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     if (!isTauri) return;
-    setMenu({ x: e.clientX, y: e.clientY });
+    tree.openMenu({
+      x: e.clientX, y: e.clientY,
+      items: buildMenu({
+        entry, isDir: false, parentDir,
+        clipboard: tree.clipboard,
+        setClipboard: tree.setClipboard,
+        reload: () => tree.bumpReload(parentDir),
+        reloadParent: () => tree.bumpReload(parentDir),
+      }),
+    });
   }
   const cutClass = tree.clipboard?.op === 'cut' && tree.clipboard.paths.includes(entry.path)
     ? ' tree-row-cut' : '';
   return (
-    <>
-      <button
-        className={`tree-row tree-file${cutClass}`}
-        style={{ paddingLeft: depth * 12 + 8 + 14 }}
-        onClick={() => onOpenFile(entry)}
-        onContextMenu={onCtx}
-      >
-        <span className="tree-ic">📄</span>
-        {entry.name}
-      </button>
-      {menu && (
-        <CtxMenu
-          x={menu.x} y={menu.y}
-          items={buildMenu({
-            entry, isDir: false, parentDir,
-            clipboard: tree.clipboard,
-            setClipboard: tree.setClipboard,
-            reload: () => tree.bumpReload(parentDir),
-            reloadParent: () => tree.bumpReload(parentDir),
-          })}
-          onClose={() => setMenu(null)}
-        />
-      )}
-    </>
+    <button
+      className={`tree-row tree-file${cutClass}`}
+      style={{ paddingLeft: depth * 12 + 8 + 14 }}
+      onClick={() => onOpenFile(entry)}
+      onContextMenu={onCtx}
+    >
+      <span className="tree-ic">📄</span>
+      {entry.name}
+    </button>
   );
 }
 
@@ -322,7 +318,8 @@ export function FileTreePanel({ rootPath, onOpenFile }: FileTreePanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<TreeClipboard | null>(null);
   const [reloadKey, setReloadKey] = useState<Record<string, number>>({});
-  const [rootMenu, setRootMenu] = useState<{ x: number; y: number } | null>(null);
+  // 전역 단일 메뉴 — 어디서 openMenu 호출하든 직전 메뉴는 자동 대체
+  const [menu, setMenu] = useState<TreeMenuState | null>(null);
 
   const bumpReload = useCallback((dirPath: string) => {
     setReloadKey((prev) => ({ ...prev, [dirPath]: (prev[dirPath] ?? 0) + 1 }));
@@ -343,20 +340,30 @@ export function FileTreePanel({ rootPath, onOpenFile }: FileTreePanelProps) {
     void reloadRoot();
   }, [rootPath, reloadRoot]);
 
-  // 루트 자체 변경 트리거
   const rootKey = reloadKey[rootPath] ?? 0;
   useEffect(() => { if (rootKey > 0) void reloadRoot(); }, [rootKey, reloadRoot]);
 
-  const ctx: TreeCtx = { clipboard, setClipboard, bumpReload, reloadKey };
+  const ctx: TreeCtx = {
+    clipboard, setClipboard, bumpReload, reloadKey,
+    openMenu: setMenu,
+  };
 
   return (
     <TreeContext.Provider value={ctx}>
       <div className="filetree"
         onContextMenu={(e) => {
-          // 빈 영역 우클릭 — 루트 메뉴 (새파일/새폴더/붙여넣기)
+          // 빈 영역 우클릭 — 루트 메뉴
           if (e.target === e.currentTarget && isTauri) {
             e.preventDefault();
-            setRootMenu({ x: e.clientX, y: e.clientY });
+            setMenu({
+              x: e.clientX, y: e.clientY,
+              items: buildMenu({
+                entry: null, isDir: false, parentDir: rootPath,
+                clipboard, setClipboard,
+                reload: () => bumpReload(rootPath),
+                reloadParent: () => bumpReload(rootPath),
+              }),
+            });
           }
         }}
       >
@@ -373,16 +380,11 @@ export function FileTreePanel({ rootPath, onOpenFile }: FileTreePanelProps) {
             ))}
           </>
         )}
-        {rootMenu && (
+        {menu && (
           <CtxMenu
-            x={rootMenu.x} y={rootMenu.y}
-            items={buildMenu({
-              entry: null, isDir: false, parentDir: rootPath,
-              clipboard, setClipboard,
-              reload: () => bumpReload(rootPath),
-              reloadParent: () => bumpReload(rootPath),
-            })}
-            onClose={() => setRootMenu(null)}
+            x={menu.x} y={menu.y}
+            items={menu.items}
+            onClose={() => setMenu(null)}
           />
         )}
       </div>
