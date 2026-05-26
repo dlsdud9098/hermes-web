@@ -8,6 +8,7 @@ mod codex_cli;
 mod fs_walk;
 mod search;
 mod sessions;
+mod usage;
 
 use serde::Serialize;
 use std::fs;
@@ -206,6 +207,7 @@ pub fn run() {
         .manage(claude_cli::RateLimitCache::default())
         .manage(codex_cli::CodexSessions::default())
         .manage(sessions::SessionIndex::default())
+        .manage(usage::UsageCache::default())
         .setup(|app| {
             // 세션 인덱스 백그라운드 워밍업 — Everything 식 캐시
             sessions::start_indexer(app.handle().clone());
@@ -231,6 +233,8 @@ pub fn run() {
             codex_cli::codex_clear_session,
             codex_cli::codex_check,
             codex_cli::codex_login_status,
+            usage::claude_usage,
+            usage::codex_usage,
         ])
         .on_window_event(|window, event| {
             // 창 닫히면 모든 Claude PTY 세션 일괄 정리 — 좀비 프로세스 방지
