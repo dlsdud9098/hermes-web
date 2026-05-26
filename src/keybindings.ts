@@ -100,26 +100,25 @@ export function useGlobalShortcuts(
 ): void {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      const mod = e.ctrlKey || e.metaKey;
       // Ctrl+1..9 → 프로젝트 전환 (고정)
-      if (mod && /^[1-9]$/.test(e.key)) {
+      if ((e.ctrlKey || e.metaKey) && /^[1-9]$/.test(e.key)) {
         e.preventDefault();
         s.switchProject(parseInt(e.key, 10));
         return;
       }
-      if (!mod) return;
 
       const combo = keyEventToCombo(e);
-      if (!combo) return;
+      if (!combo) return; // modifier-only
       const editing = isEditing(e.target);
 
-      // 매칭되는 액션 찾기
+      // 매칭되는 액션 찾기 — modifier 강제 없음 (사용자가 F5/Alt+X 등 자유 지정 가능)
       for (const [id, bound] of Object.entries(keymap) as [ShortcutAction, string][]) {
         if (bound !== combo) continue;
         const spec = ACTION_BY_ID[id];
         if (!spec) continue;
         if (editing && !spec.allowEditing) return;
         e.preventDefault();
+        e.stopPropagation();
         s[id]();
         return;
       }
