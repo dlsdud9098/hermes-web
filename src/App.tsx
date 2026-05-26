@@ -7,19 +7,27 @@ import { Workspace } from './components/Workspace';
 import { FolderPicker } from './components/FolderPicker';
 import { SettingsModal } from './components/SettingsModal';
 import { SessionBrowser } from './components/SessionBrowser';
-import { useGlobalShortcuts } from './keybindings';
+import { CommandPalette, type Command } from './components/CommandPalette';
+import { QuickOpen } from './components/QuickOpen';
+import { StatusBar } from './components/StatusBar';
+import { useGlobalShortcuts, ACTIONS } from './keybindings';
 import { useSettings } from './store/settings';
+import { invoke as invokeRuntime, isTauri as isTauriEnv } from './runtime';
 import './App.css';
 
 function Shell() {
   const { projects, activeId, openProject, setActive,
-          addTab, closeTab, setActiveTab } = useProjects();
+          addTab, closeTab, setActiveTab, cycleRecentTab } = useProjects();
   const { settings } = useSettings();
   const active = projects.find((p) => p.id === activeId) ?? projects[0];
   const [pickerOpen, setPickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [treeOpen, setTreeOpen] = useState(true);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [quickOpenOpen, setQuickOpenOpen] = useState(false);
+  // StatusBar 의 패널 수 표시용 — dockview 패널 변동 시 갱신
+  const [panelCount, setPanelCount] = useState(0);
   // 활성 Workspace 의 dockview api — 레일 파일 트리에서 뷰어 패널을 열 때 + 단축키
   const dockApiRef = useRef<DockviewApi | null>(null);
 
@@ -138,6 +146,9 @@ function Shell() {
     previewActive,
     openSearch: openSearchPanel,
     openSessions: () => setSessionsOpen(true),
+    openCommandPalette: () => setPaletteOpen(true),
+    quickOpen: () => setQuickOpenOpen(true),
+    cycleRecentTab: () => { if (active) cycleRecentTab(active.id); },
     switchProject: (i: number) => {
       const p = projects[i - 1];
       if (p) setActive(p.id);
@@ -154,12 +165,67 @@ function Shell() {
     },
   }), [newTab, splitPanel, closeActiveTab, closeActivePanel, openFolderPicker,
        previewActive, openSearchPanel, projects, setActive,
-       active, setActiveTab]);
+       active, setActiveTab, cycleRecentTab]);
 
   useGlobalShortcuts(shortcuts, settings.keymap);
 
+  // 명령 팔레트용 명령 리스트 — ACTIONS + 프로젝트/탭 + 백엔드 상태 확인
+  const commands = useMemo<Command[]>(() => {
+    const cmds: Command[] = [];
+    // 키맵 액션
+    for (const a of ACTIONS) {
+      cmds.push({
+        id: `action:${a.id}`,
+        label: a.label,
+        group: '액션',
+        shortcut: settings.keymap[a.id],
+        run: () => {
+          // shortcuts 객체 안의 동명 메서드 호출 — type-safe 디스패치
+          const fn = (shortcuts as unknown as Record<string, () => void>)[a.id];
+          if (fn) fn();
+        },
+      });
+    }
+    // 프로젝트 전환
+    for (const p of projects) {
+      cmds.push({
+        id: `proj:${p.id}`,
+        label: `프로젝트 전환: ${p.name}`,
+        group: '프로젝트',
+        run: () => setActive(p.id),
+      });
+    }
+    // 활성 프로젝트의 탭 전환
+    if (active) {
+      for (const t of active.tabs) {
+        cmds.push({
+          id: `tab:${t.id}`,
+          label: `탭 전환: ${t.name}`,
+          group: '탭',
+          run: () => setActiveTab(active.id, t.id),
+        });
+      }
+    }
+    // 백엔드 점검
+    cmds.push({
+      id: 'sys:claude_check',
+      label: 'Claude CLI 상태 점검',
+      group: '시스템',
+      run: () => {
+        if (!isTauriEnv) return;
+        void invokeRuntime<unknown>('claude_check').then((s) => {
+          // 콘솔 로그로 대체 — 별도 UI 없이 빠른 점검
+          // eslint-disable-next-line no-console
+          console.log('[claude_check]', s);
+        });
+      },
+    });
+    return cmds;
+  }, [shortcuts, projects, active, setActive, setActiveTab, settings.keymap]);
+
   return (
     <div className="app">
+      <div className="app-body">
       <ProjectRail
         treeOpen={treeOpen}
         setTreeOpen={setTreeOpen}
@@ -180,7 +246,13 @@ function Shell() {
         <Workspace
           key={active.id}
           project={active}
-          onApiReady={(api) => { dockApiRef.current = api; }}
+          onApiReady={(api) => {
+            dockApiRef.current = api;
+            setPanelCount(api.panels.length);
+            // dockview API: onDidAddPanel / onDidRemovePanel 로 카운트 동기화
+            api.onDidAddPanel(() => setPanelCount(api.panels.length));
+            api.onDidRemovePanel(() => setPanelCount(api.panels.length));
+          }}
         />
       ) : (
         <div className="empty">
@@ -212,6 +284,20 @@ function Shell() {
           }}
         />
       )}
+      {paletteOpen && (
+        <CommandPalette
+          commands={commands}
+          onClose={() => setPaletteOpen(false)}
+        />
+      )}
+      {quickOpenOpen && active && (
+        <QuickOpen
+          root={active.path}
+          onClose={() => setQuickOpenOpen(false)}
+        />
+      )}
+      </div>
+      <StatusBar panelCount={panelCount} />
     </div>
   );
 }

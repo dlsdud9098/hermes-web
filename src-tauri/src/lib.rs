@@ -4,6 +4,7 @@
 // Hermes 게이트웨이(HTTP/SSE) 는 별도 tauri-plugin-http 로 직접 호출 (CORS 우회).
 
 mod claude_cli;
+mod fs_walk;
 mod search;
 mod sessions;
 
@@ -212,6 +213,7 @@ pub fn run() {
             fs_read,
             fs_write,
             fs_skills,
+            fs_walk::fs_walk,
             sessions::sessions_list,
             sessions::sessions_refresh,
             sessions::session_load,

@@ -2,7 +2,7 @@
 // 프로젝트 = 폴더. 폴더를 열면 프로젝트가 생기고 이름은 폴더명에서 자동 도출된다.
 // localStorage 에 영속화 — 새로고침해도 프로젝트·패널 레이아웃·메시지 유지.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ChatMessage, Project, ProjectTab } from '../types';
 
@@ -37,6 +37,8 @@ interface ProjectsContextValue {
   /** 탭 이름 변경 */
   renameTab: (projectId: string, tabId: string, name: string) => void;
   setMessages: (panelId: string, messages: ChatMessage[]) => void;
+  /** 프로젝트의 가장 최근 활성 탭(현재 활성 직전)으로 토글. 없으면 무시 */
+  cycleRecentTab: (projectId: string) => void;
 }
 
 interface PersistedState {
@@ -99,6 +101,16 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   const [messages, setMessagesState] = useState<Record<string, ChatMessage[]>>(
     () => restored?.messages ?? {},
   );
+  // 프로젝트별 최근 활성 탭 스택 (MRU). 영속화 안 함 — 세션 한정
+  const recentTabsRef = useRef<Record<string, string[]>>({});
+
+  /** projectId 의 MRU 스택 맨 위에 tabId 푸시 (중복 제거, 최대 10개) */
+  const pushRecent = useCallback((projectId: string, tabId: string) => {
+    const stacks = recentTabsRef.current;
+    const prev = stacks[projectId] ?? [];
+    const next = [tabId, ...prev.filter((id) => id !== tabId)].slice(0, 10);
+    stacks[projectId] = next;
+  }, []);
 
   // 변경 시마다 localStorage 동기화
   useEffect(() => {
@@ -165,11 +177,28 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setActiveTab = useCallback((projectId: string, tabId: string) => {
-    setProjects((prev) => prev.map((p) =>
-      p.id === projectId && p.tabs.some((t) => t.id === tabId)
-        ? { ...p, activeTabId: tabId } : p,
-    ));
-  }, []);
+    setProjects((prev) => prev.map((p) => {
+      if (p.id !== projectId || !p.tabs.some((t) => t.id === tabId)) return p;
+      // 직전 활성 탭을 MRU 스택에 푸시 (현재 활성 직전 탭이 cycle 의 타깃이 된다)
+      if (p.activeTabId && p.activeTabId !== tabId) {
+        pushRecent(projectId, p.activeTabId);
+      }
+      return { ...p, activeTabId: tabId };
+    }));
+  }, [pushRecent]);
+
+  const cycleRecentTab = useCallback((projectId: string) => {
+    const stack = recentTabsRef.current[projectId] ?? [];
+    if (stack.length === 0) return;
+    // 스택의 맨 위가 직전 탭 — 현재 활성과 다를 때만 전환
+    setProjects((prev) => prev.map((p) => {
+      if (p.id !== projectId) return p;
+      const target = stack.find((id) => id !== p.activeTabId && p.tabs.some((t) => t.id === id));
+      if (!target) return p;
+      if (p.activeTabId) pushRecent(projectId, p.activeTabId);
+      return { ...p, activeTabId: target };
+    }));
+  }, [pushRecent]);
 
   const renameTab = useCallback((projectId: string, tabId: string, name: string) => {
     setProjects((prev) => prev.map((p) => p.id === projectId
@@ -186,10 +215,10 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     () => ({
       projects, activeId, messages,
       openProject, removeProject, setActive, saveLayout,
-      addTab, closeTab, setActiveTab, renameTab, setMessages,
+      addTab, closeTab, setActiveTab, renameTab, setMessages, cycleRecentTab,
     }),
     [projects, activeId, messages, openProject, removeProject, setActive, saveLayout,
-     addTab, closeTab, setActiveTab, renameTab, setMessages],
+     addTab, closeTab, setActiveTab, renameTab, setMessages, cycleRecentTab],
   );
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;

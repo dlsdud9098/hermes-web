@@ -15,7 +15,10 @@ export type ShortcutAction =
   | 'toggleFileTree'
   | 'previewActive'
   | 'openSearch'
-  | 'openSessions';
+  | 'openSessions'
+  | 'openCommandPalette'
+  | 'quickOpen'
+  | 'cycleRecentTab';
 
 export interface Shortcuts {
   newSessionTab: () => void;
@@ -33,6 +36,12 @@ export interface Shortcuts {
   previewActive: () => void;
   openSearch: () => void;
   openSessions: () => void;
+  /** Ctrl+Shift+P — 명령 팔레트 */
+  openCommandPalette: () => void;
+  /** Ctrl+P — 파일 빠른 열기 */
+  quickOpen: () => void;
+  /** Ctrl+` — 최근 활성화한 탭으로 토글 */
+  cycleRecentTab: () => void;
   /** Ctrl+Alt+1..9 — 프로젝트 전환 */
   switchProject: (index: number) => void;
   /** Ctrl+1..9 — 현재 프로젝트의 N번째 탭 전환 */
@@ -56,6 +65,9 @@ export const ACTIONS: readonly ActionSpec[] = [
   { id: 'closeActiveTab',    label: '탭 닫기 (안의 모든 분할 포함)', allowEditing: false },
   { id: 'closeActivePanel',  label: '활성 패널만 닫기',              allowEditing: false },
   { id: 'previewActive',    label: '활성 HTML 프리뷰',   allowEditing: false },
+  { id: 'openCommandPalette', label: '명령 팔레트',      allowEditing: true  },
+  { id: 'quickOpen',        label: '파일 빠른 열기',     allowEditing: true  },
+  { id: 'cycleRecentTab',   label: '최근 탭 토글',       allowEditing: false },
   { id: 'openSearch',       label: '프로젝트 전체 검색', allowEditing: true  },
   { id: 'openSessions',     label: '세션 기록 브라우저', allowEditing: true  },
   { id: 'toggleFileTree',   label: '파일 트리 토글',     allowEditing: true  },
@@ -72,9 +84,12 @@ export const DEFAULT_KEYMAP: Record<ShortcutAction, string> = {
   openSettings:     'Ctrl+,',
   openFolder:       'Ctrl+O',
   toggleFileTree:   'Ctrl+B',
-  previewActive:    'Ctrl+P',
+  previewActive:    'Ctrl+Shift+V',
   openSearch:       'Ctrl+Shift+F',
   openSessions:     'Ctrl+Shift+H',
+  openCommandPalette: 'Ctrl+Shift+P',
+  quickOpen:        'Ctrl+P',
+  cycleRecentTab:   'Ctrl+`',
 };
 
 /** KeyboardEvent → 표준 콤보 문자열 (Ctrl+Shift+F 등) */

@@ -52,6 +52,20 @@ export async function readFile(filePath: string): Promise<FileContent> {
   return res.json() as Promise<FileContent>;
 }
 
+export interface WalkEntry {
+  path: string;
+  name: string;
+  rel: string;
+}
+
+/** 프로젝트 루트 재귀 워크 — Quick Open 용. Tauri 전용. */
+export async function walkFiles(root: string, limit?: number): Promise<WalkEntry[]> {
+  if (isTauri) {
+    return invoke<WalkEntry[]>('fs_walk', { root, limit: limit ?? null });
+  }
+  throw new Error('Tauri 전용');
+}
+
 /** 파일 내용 저장 */
 export async function writeFile(filePath: string, content: string): Promise<void> {
   if (isTauri) {
