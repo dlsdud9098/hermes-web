@@ -12,6 +12,7 @@ import 'dockview/dist/styles/dockview.css';
 import { ChatPanel } from './ChatPanel';
 import { PanelTab } from './PanelTab';
 import { FileViewerPanel } from './FileViewer';
+import { HtmlPreviewPanel } from './HtmlPreview';
 import { useProjects, uid } from '../store/projects';
 import { useSettings } from '../store/settings';
 import type { Project } from '../types';
@@ -25,6 +26,9 @@ const components = {
   ),
   fileviewer: (props: IDockviewPanelProps<ViewerParams>) => (
     <FileViewerPanel filePath={props.params.filePath} />
+  ),
+  htmlpreview: (props: IDockviewPanelProps<ViewerParams>) => (
+    <HtmlPreviewPanel filePath={props.params.filePath} />
   ),
 };
 

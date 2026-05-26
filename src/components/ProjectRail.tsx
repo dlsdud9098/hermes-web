@@ -1,7 +1,6 @@
 // 세로 프로젝트 레일. 프로젝트 = 폴더.
 // 활성 프로젝트는 탭 바로 아래에 폴더 파일 트리가 펼쳐진다 (VS Code 탐색기식).
 
-import { useState } from 'react';
 import { useProjects } from '../store/projects';
 import { FileTreePanel } from './FileTree';
 import type { DirEntry } from '../api/fs';
@@ -10,12 +9,14 @@ interface ProjectRailProps {
   onOpenFolder: () => void;
   onOpenFile: (file: DirEntry) => void;
   onOpenSettings: () => void;
+  treeOpen: boolean;
+  setTreeOpen: (next: boolean | ((prev: boolean) => boolean)) => void;
 }
 
-export function ProjectRail({ onOpenFolder, onOpenFile, onOpenSettings }: ProjectRailProps) {
+export function ProjectRail({
+  onOpenFolder, onOpenFile, onOpenSettings, treeOpen, setTreeOpen,
+}: ProjectRailProps) {
   const { projects, activeId, setActive, removeProject } = useProjects();
-  // 활성 프로젝트 트리 펼침 여부 — 활성 탭을 다시 누르면 토글
-  const [treeOpen, setTreeOpen] = useState(true);
 
   function onTabClick(id: string) {
     if (id === activeId) {

@@ -19,6 +19,7 @@ import { loadLanguage } from '@uiw/codemirror-extensions-langs';
 import { readFile, writeFile, type FileContent } from '../api/fs';
 import { useSettings } from '../store/settings';
 import { taskCheckboxes } from './mdCheckbox';
+import { publishDraft } from '../previewBus';
 
 // 코드블록 신택스 하이라이터 1회 초기화 (lowlight)
 void initHighlighter();
@@ -60,7 +61,19 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
 
   const ext = extOf(filePath);
   const isMarkdown = ext === 'md' || ext === 'markdown';
+  const isPreviewable = ext === 'html' || ext === 'htm' || ext === 'svg';
   const dirty = data != null && draft !== data.content;
+
+  // draft → 프리뷰 라이브 동기화
+  useEffect(() => {
+    if (isPreviewable) publishDraft(filePath, draft);
+  }, [isPreviewable, filePath, draft]);
+
+  function openPreview() {
+    window.dispatchEvent(new CustomEvent('hermes:open-preview', {
+      detail: { filePath },
+    }));
+  }
 
   const extensions = useMemo<Extension[]>(() => {
     const list: Extension[] = [
@@ -124,12 +137,19 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
         }
       }}
     >
-      {dirty && (
+      {(dirty || isPreviewable) && (
         <div className="fileviewer-bar">
-          <span className="fileviewer-dirty">● 저장 안 됨</span>
-          <button className="btn" disabled={saving} onClick={() => void save()}>
-            {saving ? '저장 중…' : '저장 (Ctrl+S)'}
-          </button>
+          {dirty && <span className="fileviewer-dirty">● 저장 안 됨</span>}
+          {isPreviewable && (
+            <button className="btn btn-ghost" onClick={openPreview} title="Ctrl+P">
+              👁 프리뷰
+            </button>
+          )}
+          {dirty && (
+            <button className="btn" disabled={saving} onClick={() => void save()}>
+              {saving ? '저장 중…' : '저장 (Ctrl+S)'}
+            </button>
+          )}
         </div>
       )}
 
