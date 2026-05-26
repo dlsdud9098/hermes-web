@@ -117,6 +117,105 @@ fn fs_write(path: String, content: String) -> Result<(), String> {
     fs::write(PathBuf::from(path), content).map_err(|e| e.to_string())
 }
 
+// ─────────── 파일 트리 컨텍스트 메뉴 작업 ───────────
+
+/// 재귀 복사 — 파일 또는 디렉토리. dst 가 존재하면 에러.
+fn copy_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
+    let meta = fs::metadata(src)?;
+    if meta.is_dir() {
+        fs::create_dir(dst)?;
+        for entry in fs::read_dir(src)? {
+            let entry = entry?;
+            let from = entry.path();
+            let to = dst.join(entry.file_name());
+            copy_recursive(&from, &to)?;
+        }
+    } else {
+        fs::copy(src, dst)?;
+    }
+    Ok(())
+}
+
+/// 중복 시 ' (1)' / ' (2)' 식으로 고유 경로 만들기
+fn unique_path(target: &Path) -> PathBuf {
+    if !target.exists() { return target.to_path_buf(); }
+    let parent = target.parent().unwrap_or_else(|| Path::new("."));
+    let stem = target.file_stem().and_then(|s| s.to_str()).unwrap_or("copy").to_string();
+    let ext = target.extension().and_then(|s| s.to_str()).unwrap_or("");
+    let mut n = 1;
+    loop {
+        let name = if ext.is_empty() {
+            format!("{} ({})", stem, n)
+        } else {
+            format!("{} ({}).{}", stem, n, ext)
+        };
+        let p = parent.join(name);
+        if !p.exists() { return p; }
+        n += 1;
+    }
+}
+
+#[tauri::command]
+fn fs_copy(src: String, dst_dir: String) -> Result<String, String> {
+    let src_p = PathBuf::from(&src);
+    let name = src_p.file_name().ok_or("src 파일명 없음".to_string())?;
+    let target = PathBuf::from(&dst_dir).join(name);
+    let final_target = unique_path(&target);
+    copy_recursive(&src_p, &final_target).map_err(|e| format!("copy: {}", e))?;
+    Ok(final_target.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn fs_move(src: String, dst_dir: String) -> Result<String, String> {
+    let src_p = PathBuf::from(&src);
+    let name = src_p.file_name().ok_or("src 파일명 없음".to_string())?;
+    let target = PathBuf::from(&dst_dir).join(name);
+    let final_target = unique_path(&target);
+    fs::rename(&src_p, &final_target).map_err(|e| format!("move: {}", e))?;
+    Ok(final_target.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn fs_rename(src: String, new_name: String) -> Result<String, String> {
+    let src_p = PathBuf::from(&src);
+    let parent = src_p.parent().ok_or("부모 폴더 없음".to_string())?;
+    let new_path = parent.join(&new_name);
+    if new_path.exists() {
+        return Err(format!("이미 존재: {}", new_name));
+    }
+    fs::rename(&src_p, &new_path).map_err(|e| format!("rename: {}", e))?;
+    Ok(new_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn fs_delete(path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    if !p.exists() { return Ok(()); }
+    let meta = fs::metadata(&p).map_err(|e| e.to_string())?;
+    if meta.is_dir() {
+        fs::remove_dir_all(&p).map_err(|e| format!("delete dir: {}", e))?;
+    } else {
+        fs::remove_file(&p).map_err(|e| format!("delete file: {}", e))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn fs_mkdir(parent: String, name: String) -> Result<String, String> {
+    let p = PathBuf::from(&parent).join(&name);
+    if p.exists() { return Err(format!("이미 존재: {}", name)); }
+    fs::create_dir_all(&p).map_err(|e| format!("mkdir: {}", e))?;
+    Ok(p.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn fs_new_file(parent: String, name: String) -> Result<String, String> {
+    let p = PathBuf::from(&parent).join(&name);
+    if p.exists() { return Err(format!("이미 존재: {}", name)); }
+    fs::write(&p, "").map_err(|e| format!("new file: {}", e))?;
+    Ok(p.to_string_lossy().to_string())
+}
+
 /// SKILL.md YAML 프론트매터에서 name/description 추출
 fn parse_skill_md(file: &Path, fallback: &str) -> Skill {
     let text = fs::read_to_string(file).unwrap_or_default();
@@ -326,6 +425,12 @@ pub fn run() {
             fs_list,
             fs_read,
             fs_write,
+            fs_copy,
+            fs_move,
+            fs_rename,
+            fs_delete,
+            fs_mkdir,
+            fs_new_file,
             fs_skills,
             provider_skills,
             fs_walk::fs_walk,

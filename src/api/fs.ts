@@ -66,6 +66,42 @@ export async function walkFiles(root: string, limit?: number): Promise<WalkEntry
   throw new Error('Tauri 전용');
 }
 
+/** 파일/폴더를 다른 폴더로 복사 (이름 중복 시 자동 ' (1)' 부여). 반환=새 경로. Tauri 전용. */
+export async function fsCopy(src: string, dstDir: string): Promise<string> {
+  if (!isTauri) throw new Error('Tauri 전용');
+  return invoke<string>('fs_copy', { src, dstDir });
+}
+
+/** 파일/폴더 이동 (=잘라내기+붙여넣기). Tauri 전용. */
+export async function fsMove(src: string, dstDir: string): Promise<string> {
+  if (!isTauri) throw new Error('Tauri 전용');
+  return invoke<string>('fs_move', { src, dstDir });
+}
+
+/** 이름 변경 (같은 부모 폴더 안). Tauri 전용. */
+export async function fsRename(src: string, newName: string): Promise<string> {
+  if (!isTauri) throw new Error('Tauri 전용');
+  return invoke<string>('fs_rename', { src, newName });
+}
+
+/** 파일/폴더 삭제 (폴더는 재귀). Tauri 전용. */
+export async function fsDelete(path: string): Promise<void> {
+  if (!isTauri) throw new Error('Tauri 전용');
+  return invoke<void>('fs_delete', { path });
+}
+
+/** 새 디렉토리 생성. Tauri 전용. */
+export async function fsMkdir(parent: string, name: string): Promise<string> {
+  if (!isTauri) throw new Error('Tauri 전용');
+  return invoke<string>('fs_mkdir', { parent, name });
+}
+
+/** 새 빈 파일 생성. Tauri 전용. */
+export async function fsNewFile(parent: string, name: string): Promise<string> {
+  if (!isTauri) throw new Error('Tauri 전용');
+  return invoke<string>('fs_new_file', { parent, name });
+}
+
 /** 파일 내용 저장 */
 export async function writeFile(filePath: string, content: string): Promise<void> {
   if (isTauri) {
