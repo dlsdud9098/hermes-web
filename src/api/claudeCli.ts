@@ -36,6 +36,24 @@ export async function claudeStopAll(): Promise<void> {
   return invoke<void>('claude_stop_all');
 }
 
+export interface ClaudeRateLimit {
+  status: string;            // "allowed" | "exceeded" 등
+  resets_at: number;         // unix epoch (초)
+  rate_limit_type: string;   // "five_hour" 등
+  is_using_overage: boolean;
+  checked_at_ms: number;
+}
+
+/** Max 구독 quota 조회 — 5h 윈도우 안에선 캐시. force=true 로 즉시 재조회 */
+export async function claudeRateLimit(force = false): Promise<ClaudeRateLimit | null> {
+  if (!isTauri) return null;
+  try {
+    return await invoke<ClaudeRateLimit | null>('claude_rate_limit', { force });
+  } catch {
+    return null;
+  }
+}
+
 export async function claudeCheck(): Promise<ClaudeStatus> {
   if (!isTauri) {
     return { installed: false, logged_in: false, version: '', login_method: '' };

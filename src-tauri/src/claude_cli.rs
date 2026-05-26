@@ -456,3 +456,124 @@ pub fn claude_check() -> Result<ClaudeStatus, String> {
 pub fn manage_state(app: &AppHandle) {
     app.manage(ClaudeSessions::default());
 }
+
+// ────────────────────── Max 구독 rate limit 조회 ──────────────────────
+// `claude -p "ok" --output-format stream-json --verbose` 의 첫
+// rate_limit_event 를 PTY 안에서 받아 파싱. Max 구독 한도 풀의 resetsAt
+// 까지는 캐싱 — 5시간 윈도우 안에서 재호출 안 함 (구독 quota 절약).
+
+#[derive(Serialize, Clone)]
+pub struct ClaudeRateLimit {
+    pub status: String,         // "allowed" | "exceeded" 등
+    pub resets_at: u64,         // unix epoch (초)
+    pub rate_limit_type: String,// "five_hour" 등
+    pub is_using_overage: bool,
+    pub checked_at_ms: u64,
+}
+
+#[derive(Default)]
+pub struct RateLimitCache {
+    pub inner: Mutex<Option<ClaudeRateLimit>>,
+}
+
+fn parse_rate_limit(text: &str) -> Option<ClaudeRateLimit> {
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() { continue; }
+        let v: serde_json::Value = match serde_json::from_str(line) {
+            Ok(v) => v, Err(_) => continue,
+        };
+        if v.get("type").and_then(|x| x.as_str()) != Some("rate_limit_event") {
+            continue;
+        }
+        let info = v.get("rate_limit_info")?;
+        let status = info.get("status").and_then(|x| x.as_str()).unwrap_or("").to_string();
+        let resets_at = info.get("resetsAt").and_then(|x| x.as_u64()).unwrap_or(0);
+        let rate_limit_type = info.get("rateLimitType")
+            .and_then(|x| x.as_str()).unwrap_or("").to_string();
+        let is_using_overage = info.get("isUsingOverage")
+            .and_then(|x| x.as_bool()).unwrap_or(false);
+        let checked_at_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64).unwrap_or(0);
+        return Some(ClaudeRateLimit {
+            status, resets_at, rate_limit_type, is_using_overage, checked_at_ms,
+        });
+    }
+    None
+}
+
+fn query_rate_limit() -> Result<ClaudeRateLimit, String> {
+    use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+    use std::time::Instant;
+
+    let pty = native_pty_system();
+    let pair = pty.openpty(PtySize {
+        rows: 40, cols: 140, pixel_width: 0, pixel_height: 0,
+    }).map_err(|e| e.to_string())?;
+
+    let mut cmd = CommandBuilder::new("claude");
+    cmd.arg("-p");
+    cmd.arg("ok");
+    cmd.arg("--output-format");
+    cmd.arg("stream-json");
+    cmd.arg("--verbose");
+    cmd.arg("--include-partial-messages");
+
+    let mut child = pair.slave.spawn_command(cmd)
+        .map_err(|e| format!("claude spawn 실패: {}", e))?;
+    drop(pair.slave);
+
+    let mut reader = pair.master.try_clone_reader()
+        .map_err(|e| e.to_string())?;
+    let mut buf: Vec<u8> = Vec::new();
+    let start = Instant::now();
+    let mut tmp = [0u8; 4096];
+
+    let result: Result<ClaudeRateLimit, String> = loop {
+        if start.elapsed() > Duration::from_secs(15) {
+            break Err("rate_limit 조회 타임아웃".into());
+        }
+        match reader.read(&mut tmp) {
+            Ok(0) => {
+                let text = String::from_utf8_lossy(&buf);
+                if let Some(rl) = parse_rate_limit(&text) { break Ok(rl); }
+                break Err("rate_limit_event 미발견".into());
+            }
+            Ok(n) => {
+                buf.extend_from_slice(&tmp[..n]);
+                let text = String::from_utf8_lossy(&buf);
+                if let Some(rl) = parse_rate_limit(&text) { break Ok(rl); }
+            }
+            Err(e) => break Err(format!("PTY read: {}", e)),
+        }
+    };
+
+    let _ = child.kill();
+    let _ = child.wait();
+    result
+}
+
+#[tauri::command]
+pub fn claude_rate_limit(
+    state: tauri::State<'_, RateLimitCache>,
+    force: bool,
+) -> Result<Option<ClaudeRateLimit>, String> {
+    let now_s = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    if !force {
+        let cache = state.inner.lock().unwrap();
+        if let Some(rl) = cache.as_ref() {
+            if rl.resets_at > now_s {
+                return Ok(Some(rl.clone()));
+            }
+        }
+    }
+    match query_rate_limit() {
+        Ok(rl) => {
+            *state.inner.lock().unwrap() = Some(rl.clone());
+            Ok(Some(rl))
+        }
+        Err(_) => Ok(None),
+    }
+}

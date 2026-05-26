@@ -202,6 +202,7 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
         .manage(claude_cli::ClaudeSessions::default())
+        .manage(claude_cli::RateLimitCache::default())
         .manage(sessions::SessionIndex::default())
         .setup(|app| {
             // 세션 인덱스 백그라운드 워밍업 — Everything 식 캐시
@@ -223,6 +224,7 @@ pub fn run() {
             claude_cli::claude_stop,
             claude_cli::claude_stop_all,
             claude_cli::claude_check,
+            claude_cli::claude_rate_limit,
         ])
         .on_window_event(|window, event| {
             // 창 닫히면 모든 Claude PTY 세션 일괄 정리 — 좀비 프로세스 방지
