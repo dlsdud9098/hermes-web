@@ -70,6 +70,18 @@ function Shell() {
     return () => window.removeEventListener('hermes:open-file', onOpenFile);
   }, []);
 
+  // 인앱 브라우저 패널 열기
+  const openBrowser = useCallback((url?: string) => {
+    const api = dockApiRef.current;
+    if (!api) return;
+    api.addPanel({
+      id: uid('panel'),
+      component: 'browser',
+      title: url ? `🌐 ${new URL(url.startsWith('http') ? url : `http://${url}`).hostname}` : '🌐 브라우저',
+      params: { url: url ?? '' },
+    });
+  }, []);
+
   const openSearchPanel = useCallback(() => {
     const api = dockApiRef.current;
     if (!api || !active) return;
@@ -222,8 +234,15 @@ function Shell() {
         });
       },
     });
+    // 브라우저 패널 열기
+    cmds.push({
+      id: 'panel:browser',
+      label: '🌐 새 브라우저 패널 (인앱 iframe)',
+      group: '패널',
+      run: () => openBrowser(),
+    });
     return cmds;
-  }, [shortcuts, projects, active, setActive, setActiveTab, settings.keymap]);
+  }, [shortcuts, projects, active, setActive, setActiveTab, settings.keymap, openBrowser]);
 
   return (
     <div className="app">

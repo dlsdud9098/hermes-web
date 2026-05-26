@@ -19,6 +19,7 @@ import { SessionViewerPanel } from './SessionViewer';
 import { SearchPanel } from './SearchPanel';
 import { ClaudeCodePanel } from './ClaudeCodePanel';
 import { CodexPanel } from './CodexPanel';
+import { BrowserPanel } from './BrowserPanel';
 import { TabBar } from './TabBar';
 import { useProjects, uid } from '../store/projects';
 import { useSettings } from '../store/settings';
@@ -75,6 +76,9 @@ const components = {
   ),
   codex: (props: IDockviewPanelProps<ChatParams>) => (
     <CodexPanel panelId={props.api.id} projectId={props.params.projectId} />
+  ),
+  browser: (props: IDockviewPanelProps<{ url?: string }>) => (
+    <BrowserPanel initialUrl={props.params.url ?? ''} />
   ),
 };
 
