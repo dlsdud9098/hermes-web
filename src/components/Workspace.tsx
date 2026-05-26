@@ -15,6 +15,7 @@ import { FileViewerPanel } from './FileViewer';
 import { HtmlPreviewPanel } from './HtmlPreview';
 import { SessionViewerPanel } from './SessionViewer';
 import { SearchPanel } from './SearchPanel';
+import { ClaudeCodePanel } from './ClaudeCodePanel';
 import { useProjects, uid } from '../store/projects';
 import { useSettings } from '../store/settings';
 import type { Project } from '../types';
@@ -46,6 +47,9 @@ const components = {
   ),
   search: (props: IDockviewPanelProps<SearchParams>) => (
     <SearchPanel projectPath={props.params.projectPath} onOpenFile={emitOpenFile} />
+  ),
+  claudecode: (props: IDockviewPanelProps<ChatParams>) => (
+    <ClaudeCodePanel panelId={props.api.id} projectId={props.params.projectId} />
   ),
 };
 
@@ -92,13 +96,17 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
   }, [project.id, project.layout, saveLayout, seed, onApiReady]);
 
   // mode 'tab' → 활성 그룹에 탭으로 추가 / 'split' → 오른쪽으로 세로 분할
-  const addSession = useCallback((mode: 'tab' | 'split') => {
+  const addSession = useCallback((
+    mode: 'tab' | 'split',
+    backend: 'chat' | 'claudecode' = 'chat',
+  ) => {
     const api = apiRef.current;
     if (!api) return;
+    const prefix = backend === 'claudecode' ? 'Claude' : '세션';
     api.addPanel({
       id: uid('panel'),
-      component: 'chat',
-      title: `세션 ${counterRef.current++}`,
+      component: backend,
+      title: `${prefix} ${counterRef.current++}`,
       params: { projectId: project.id },
       ...(mode === 'split'
         ? { position: { direction: 'right' as const } }
@@ -114,7 +122,11 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
         </span>
         <div className="workspace-actions">
           <button className="btn btn-ghost" onClick={() => addSession('tab')}>
-            + 탭
+            + Hermes
+          </button>
+          <button className="btn btn-ghost" onClick={() => addSession('tab', 'claudecode')}
+            title="Claude Code 인터랙티브 세션 (Max 구독)">
+            + Claude
           </button>
           <button className="btn btn-ghost" onClick={() => addSession('split')}>
             + 분할

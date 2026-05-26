@@ -3,6 +3,7 @@
 // 같은 시맨틱. 프론트엔드는 Tauri 환경에서만 invoke 로 호출.
 // Hermes 게이트웨이(HTTP/SSE) 는 별도 tauri-plugin-http 로 직접 호출 (CORS 우회).
 
+mod claude_cli;
 mod search;
 mod sessions;
 
@@ -199,6 +200,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_http::init())
+        .manage(claude_cli::ClaudeSessions::default())
         .invoke_handler(tauri::generate_handler![
             fs_list,
             fs_read,
@@ -207,6 +209,10 @@ pub fn run() {
             sessions::sessions_list,
             sessions::session_load,
             search::search_in_dir,
+            claude_cli::claude_start,
+            claude_cli::claude_send,
+            claude_cli::claude_stop,
+            claude_cli::claude_check,
         ])
         .run(tauri::generate_context!())
         .expect("Tauri 앱 실행 실패");
