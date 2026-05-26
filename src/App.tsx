@@ -93,10 +93,21 @@ function Shell() {
     });
   }, [active, settings.chatProvider]);
 
-  const closeActivePanel = useCallback(() => {
+  const closeActiveTab = useCallback(() => {
     const api = dockApiRef.current;
     const panel = api?.activePanel;
     if (panel) panel.api.close();
+  }, []);
+
+  // 활성 그룹(분할 칸) 전체 닫기 — 안에 있는 모든 탭 제거
+  const closeActiveGroup = useCallback(() => {
+    const api = dockApiRef.current;
+    const group = api?.activeGroup;
+    if (!group) return;
+    // 그룹 내 모든 패널 닫기 (역순 — 인덱스 안정성)
+    for (let i = group.panels.length - 1; i >= 0; i--) {
+      group.panels[i].api.close();
+    }
   }, []);
 
   const previewActive = useCallback(() => {
@@ -117,7 +128,8 @@ function Shell() {
     newSessionSplitH: () => addSession('below'),
     // 세로 분할 = 세로선 = 좌우 배치
     newSessionSplitV: () => addSession('right'),
-    closeActivePanel,
+    closeActiveTab,
+    closeActiveGroup,
     openSettings: () => setSettingsOpen(true),
     openFolder: openFolderPicker,
     toggleFileTree: () => setTreeOpen((o) => !o),
@@ -128,7 +140,7 @@ function Shell() {
       const p = projects[i - 1];
       if (p) setActive(p.id);
     },
-  }), [addSession, closeActivePanel, openFolderPicker,
+  }), [addSession, closeActiveTab, closeActiveGroup, openFolderPicker,
        previewActive, openSearchPanel, projects, setActive]);
 
   useGlobalShortcuts(shortcuts, settings.keymap);
