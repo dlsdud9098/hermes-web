@@ -70,7 +70,7 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
       id: uid('panel'),
       component: 'chat',
       title: '세션 1',
-      params: { projectId: project.id },
+      params: { projectId: project.id, tabId: uid('tab') },
     });
   }, [project.id]);
 
@@ -95,19 +95,28 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
     event.api.onDidAddPanel((panel) => panel.api.onDidTitleChange(persist));
   }, [project.id, project.layout, saveLayout, seed, onApiReady]);
 
-  // mode: 'tab' = 같은 그룹에 탭 추가 / 'right' = 가로 분할 / 'below' = 세로 분할
+  // 탭 모델 — params.tabId 가 "탭" 정체성. 분할은 같은 tabId, '+ 탭' 은 새 tabId.
   const addSession = useCallback((mode: 'tab' | 'right' | 'below') => {
     const api = apiRef.current;
     if (!api) return;
     const isClaude = settings.chatProvider === 'claude';
+
+    const activePanel = api.activePanel;
+    const activeTabId = (activePanel?.params as { tabId?: string } | undefined)?.tabId;
+    const tabId = mode === 'tab' ? uid('tab') : (activeTabId ?? uid('tab'));
+
+    // '+ 탭' = 새 그룹(오른쪽). 분할은 명시 방향
+    const position: { direction: 'right' | 'below' } | undefined =
+      mode === 'tab'
+        ? (api.panels.length > 0 ? { direction: 'right' } : undefined)
+        : { direction: mode };
+
     api.addPanel({
       id: uid('panel'),
       component: isClaude ? 'claudecode' : 'chat',
       title: `${isClaude ? 'Claude' : '세션'} ${counterRef.current++}`,
-      params: { projectId: project.id },
-      ...(mode === 'tab'
-        ? {}
-        : { position: { direction: mode as 'right' | 'below' } }),
+      params: { projectId: project.id, tabId },
+      ...(position ? { position } : {}),
     });
   }, [project.id, settings.chatProvider]);
 

@@ -80,34 +80,55 @@ function Shell() {
 
   const openFolderPicker = useCallback(() => setPickerOpen(true), []);
 
+  // 탭 모델 — 각 panel param 에 tabId. 같은 tabId = 같은 "탭"의 분할들.
+  // '+ 탭' → 새 tabId, 새 그룹. '+ 가로/세로 분할' → 현재 tabId 상속, 새 그룹(방향).
   const addSession = useCallback((mode: 'tab' | 'right' | 'below') => {
     const api = dockApiRef.current;
     if (!api || !active) return;
     const isClaude = settings.chatProvider === 'claude';
+
+    const activePanel = api.activePanel;
+    const activeTabId = (activePanel?.params as { tabId?: string } | undefined)?.tabId;
+    const tabId = mode === 'tab' ? uid('tab') : (activeTabId ?? uid('tab'));
+
+    // '+ 탭' 은 새 그룹 — 빈 워크스페이스면 그냥 첫 패널로, 아니면 오른쪽 그룹
+    let position: { direction: 'right' | 'below' } | undefined;
+    if (mode === 'tab') {
+      position = api.panels.length > 0 ? { direction: 'right' } : undefined;
+    } else {
+      position = { direction: mode };
+    }
+
     api.addPanel({
       id: uid('panel'),
       component: isClaude ? 'claudecode' : 'chat',
       title: `${isClaude ? 'Claude' : '세션'} ${api.panels.length + 1}`,
-      params: { projectId: active.id },
-      ...(mode === 'tab' ? {} : { position: { direction: mode } }),
+      params: { projectId: active.id, tabId },
+      ...(position ? { position } : {}),
     });
   }, [active, settings.chatProvider]);
 
+  // 탭 닫기 — 같은 tabId 가진 모든 패널 close (안의 분할 모두 제거)
   const closeActiveTab = useCallback(() => {
     const api = dockApiRef.current;
-    const panel = api?.activePanel;
-    if (panel) panel.api.close();
+    if (!api) return;
+    const activePanel = api.activePanel;
+    if (!activePanel) return;
+    const tabId = (activePanel.params as { tabId?: string } | undefined)?.tabId;
+    if (!tabId) {
+      // 레거시 패널(레이아웃 복원 등 tabId 없음) — 활성 패널만 close
+      activePanel.api.close();
+      return;
+    }
+    const targets = api.panels.filter(
+      (p) => (p.params as { tabId?: string } | undefined)?.tabId === tabId,
+    );
+    for (const p of targets) p.api.close();
   }, []);
 
-  // 활성 그룹(분할 칸) 전체 닫기 — 안에 있는 모든 탭 제거
-  const closeActiveGroup = useCallback(() => {
-    const api = dockApiRef.current;
-    const group = api?.activeGroup;
-    if (!group) return;
-    // 그룹 내 모든 패널 닫기 (역순 — 인덱스 안정성)
-    for (let i = group.panels.length - 1; i >= 0; i--) {
-      group.panels[i].api.close();
-    }
+  // 활성 패널만 close — 같은 탭의 다른 분할은 유지
+  const closeActivePanel = useCallback(() => {
+    dockApiRef.current?.activePanel?.api.close();
   }, []);
 
   const previewActive = useCallback(() => {
@@ -129,7 +150,7 @@ function Shell() {
     // 세로 분할 = 세로선 = 좌우 배치
     newSessionSplitV: () => addSession('right'),
     closeActiveTab,
-    closeActiveGroup,
+    closeActivePanel,
     openSettings: () => setSettingsOpen(true),
     openFolder: openFolderPicker,
     toggleFileTree: () => setTreeOpen((o) => !o),
@@ -140,7 +161,7 @@ function Shell() {
       const p = projects[i - 1];
       if (p) setActive(p.id);
     },
-  }), [addSession, closeActiveTab, closeActiveGroup, openFolderPicker,
+  }), [addSession, closeActiveTab, closeActivePanel, openFolderPicker,
        previewActive, openSearchPanel, projects, setActive]);
 
   useGlobalShortcuts(shortcuts, settings.keymap);

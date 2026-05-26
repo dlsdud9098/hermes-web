@@ -9,7 +9,7 @@ export type ShortcutAction =
   | 'newSessionSplitH'
   | 'newSessionSplitV'
   | 'closeActiveTab'
-  | 'closeActiveGroup'
+  | 'closeActivePanel'
   | 'openSettings'
   | 'openFolder'
   | 'toggleFileTree'
@@ -23,10 +23,10 @@ export interface Shortcuts {
   newSessionSplitH: () => void;
   /** 세로 분할 — 좌우 배치 */
   newSessionSplitV: () => void;
-  /** 현재 탭 1개만 닫기 */
+  /** 탭 닫기 — 같은 tabId 묶음(분할 모두 포함) 통째로 close */
   closeActiveTab: () => void;
-  /** 활성 그룹(분할 한 칸) 통째로 닫기 */
-  closeActiveGroup: () => void;
+  /** 활성 패널 1개만 close (같은 탭의 다른 분할은 유지) */
+  closeActivePanel: () => void;
   openSettings: () => void;
   openFolder: () => void;
   toggleFileTree: () => void;
@@ -49,8 +49,8 @@ export const ACTIONS: readonly ActionSpec[] = [
   { id: 'newSessionTab',     label: '새 세션 탭',                    allowEditing: false },
   { id: 'newSessionSplitH',  label: '새 세션 가로 분할(─, 위아래)',  allowEditing: false },
   { id: 'newSessionSplitV',  label: '새 세션 세로 분할(│, 좌우)',    allowEditing: false },
-  { id: 'closeActiveTab',    label: '현재 탭 닫기',                  allowEditing: false },
-  { id: 'closeActiveGroup',  label: '활성 패널(분할 한 칸) 닫기',    allowEditing: false },
+  { id: 'closeActiveTab',    label: '탭 닫기 (안의 모든 분할 포함)', allowEditing: false },
+  { id: 'closeActivePanel',  label: '활성 패널만 닫기',              allowEditing: false },
   { id: 'previewActive',    label: '활성 HTML 프리뷰',   allowEditing: false },
   { id: 'openSearch',       label: '프로젝트 전체 검색', allowEditing: true  },
   { id: 'openSessions',     label: '세션 기록 브라우저', allowEditing: true  },
@@ -64,7 +64,7 @@ export const DEFAULT_KEYMAP: Record<ShortcutAction, string> = {
   newSessionSplitH:  'Ctrl+Shift+N',
   newSessionSplitV:  'Ctrl+Alt+N',
   closeActiveTab:    'Ctrl+W',
-  closeActiveGroup:  'Ctrl+Shift+W',
+  closeActivePanel:  'Ctrl+Shift+W',
   openSettings:     'Ctrl+,',
   openFolder:       'Ctrl+O',
   toggleFileTree:   'Ctrl+B',
