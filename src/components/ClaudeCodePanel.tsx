@@ -19,6 +19,7 @@ import { useProjects } from '../store/projects';
 import { useSettings } from '../store/settings';
 import { Markdown } from './Markdown';
 import { ToolCard } from './ToolCard';
+import { CopyButton } from './CopyButton';
 import type { ChatMessage, ToolCall } from '../types';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 
@@ -191,7 +192,10 @@ export function ClaudeCodePanel({ panelId, projectId }: Props) {
         )}
         {messages.map((m, i) => (
           <div key={i} className={`msg msg-${m.role}`}>
-            <span className="msg-role">{m.role}</span>
+            <div className="msg-head">
+              <span className="msg-role">{m.role}</span>
+              {m.content && <CopyButton text={m.content} />}
+            </div>
             <div className="msg-body">
               {m.role === 'assistant' ? (
                 <>

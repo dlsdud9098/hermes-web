@@ -10,6 +10,7 @@ import { SkillMenu } from './SkillMenu';
 import { Markdown } from './Markdown';
 import { ToolCard } from './ToolCard';
 import { ApprovalCard } from './ApprovalCard';
+import { CopyButton } from './CopyButton';
 import type { ChatMessage, ToolCall } from '../types';
 
 interface PendingApproval {
@@ -166,14 +167,6 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
     runTurn(text, [...messages, { role: 'user', content: text }]);
   }
 
-  // 마지막 assistant 응답을 버리고 마지막 user 메시지를 다시 실행
-  function regenerate() {
-    if (streaming) return;
-    const lastUserIdx = messages.map((m) => m.role).lastIndexOf('user');
-    if (lastUserIdx < 0) return;
-    runTurn(messages[lastUserIdx].content, messages.slice(0, lastUserIdx + 1));
-  }
-
   function stop() {
     abortRef.current?.abort();
   }
@@ -233,7 +226,10 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
         )}
         {messages.map((m, i) => (
           <div key={i} className={`msg msg-${m.role}`}>
-            <span className="msg-role">{m.role}</span>
+            <div className="msg-head">
+              <span className="msg-role">{m.role}</span>
+              {m.content && <CopyButton text={m.content} />}
+            </div>
             <div className="msg-body">
               {m.role === 'assistant' ? (
                 <>
@@ -255,10 +251,6 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
                   <span>↑{m.usage.input} ↓{m.usage.output}</span>
                 )}
               </div>
-            )}
-            {m.role === 'assistant' && i === messages.length - 1
-              && !streaming && m.content && (
-              <button className="msg-action" onClick={regenerate}>↻ 재생성</button>
             )}
           </div>
         ))}

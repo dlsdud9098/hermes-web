@@ -853,3 +853,25 @@
   background: var(--bg-bar);
   border-bottom: 1px solid var(--border);
 }
+
+/* 메시지 헤더 + 복사 버튼 (hover 노출) */
+.msg-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.msg-copy {
+  opacity: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 10px;
+  padding: 1px 6px;
+  cursor: pointer;
+  margin-left: auto;
+  transition: opacity 0.15s, color 0.15s;
+}
+.msg:hover .msg-copy { opacity: 1; }
+.msg-copy:hover { color: var(--accent); border-color: var(--accent); }
