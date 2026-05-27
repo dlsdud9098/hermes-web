@@ -3,7 +3,7 @@
 //   본문: 활성 탭의 dockview — 안에서 panel 들을 자유 분할 (pane).
 // 탭 닫기 = 그 탭의 모든 panel 사라짐.
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   DockviewReact,
   type DockviewApi,
@@ -88,8 +88,30 @@ interface WorkspaceProps {
   onApiReady: (api: DockviewApi) => void;
 }
 
+type DropKind = 'tab' | 'left' | 'right' | 'top' | 'bottom';
+
+function computeDropZone(e: React.DragEvent, rect: DOMRect): DropKind {
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const w = rect.width, h = rect.height;
+  if (w <= 0 || h <= 0) return 'tab';
+  const dl = x / w;
+  const dr = (w - x) / w;
+  const dt = y / h;
+  const db = (h - y) / h;
+  const EDGE = 0.22;
+  const minD = Math.min(dl, dr, dt, db);
+  if (minD > EDGE) return 'tab';
+  if (minD === dl) return 'left';
+  if (minD === dr) return 'right';
+  if (minD === dt) return 'top';
+  return 'bottom';
+}
+
 export function Workspace({ project, onApiReady }: WorkspaceProps) {
   const { saveLayout, addTab, closeTab, setActiveTab, renameTab } = useProjects();
+  const dockBoxRef = useRef<HTMLDivElement>(null);
+  const [dropZone, setDropZone] = useState<DropKind | null>(null);
   // 'hermes:move-panel-to-tab' 이벤트 처리 — 패널 ↔ 탭 이동
   useEffect(() => {
     function onMove(e: Event) {
@@ -168,39 +190,58 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
     event.api.onDidAddPanel((panel) => panel.api.onDidTitleChange(persist));
   }, [project.id, activeTab.id, activeTab.layout, saveLayout, seed, onApiReady]);
 
-  // 파일 트리에서 드래그&드롭 → 파일 뷰어 패널 열기 (VSCode 식)
+  // 파일 트리 D&D → 워크스페이스에 fileviewer 패널 (VSCode 식 방향 split)
   function onDragOver(e: React.DragEvent) {
     if (!e.dataTransfer.types.includes('application/x-hermes-file')) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
+    const rect = dockBoxRef.current?.getBoundingClientRect();
+    if (rect) setDropZone(computeDropZone(e, rect));
   }
+  function onDragLeave() { setDropZone(null); }
   function onDrop(e: React.DragEvent) {
     const raw = e.dataTransfer.getData('application/x-hermes-file');
+    setDropZone(null);
     if (!raw) return;
     e.preventDefault();
     try {
       const { path, name } = JSON.parse(raw) as { path: string; name: string };
       const api = apiRef.current;
       if (!api) return;
-      // 같은 파일이 이미 열려있으면 활성화만
-      const existing = api.panels.find((p) => {
-        const params = p.params as { filePath?: string } | undefined;
-        return params?.filePath === path;
-      });
-      if (existing) { existing.api.setActive(); return; }
+      const rect = dockBoxRef.current?.getBoundingClientRect();
+      const zone = rect ? computeDropZone(e, rect) : 'tab';
+      // 같은 파일 이미 열려있으면 활성화만 (tab 모드에서만 — split 은 사용자가 명시 의도)
+      if (zone === 'tab') {
+        const existing = api.panels.find((p) => {
+          const params = p.params as { filePath?: string } | undefined;
+          return params?.filePath === path;
+        });
+        if (existing) { existing.api.setActive(); return; }
+      }
+      const active = api.activePanel;
+      const direction = zone === 'left' ? 'left'
+        : zone === 'right' ? 'right'
+        : zone === 'top' ? 'above'
+        : zone === 'bottom' ? 'below' : null;
       api.addPanel({
         id: uid('panel'),
         component: 'fileviewer',
         title: name,
         params: { filePath: path },
+        ...(direction && active
+          ? { position: { referencePanel: active.api.id, direction } }
+          : {}),
       });
     } catch {
-      // JSON 파싱 실패 — 무시
+      // 무시
     }
   }
 
   return (
-    <div className="workspace" onDragOver={onDragOver} onDrop={onDrop}>
+    <div className="workspace"
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}>
       <TabBar
         tabs={project.tabs}
         activeId={project.activeTabId}
@@ -210,15 +251,18 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
         onRename={(id, name) => renameTab(project.id, id, name)}
       />
       {/* key={activeTab.id} → 탭 전환 시 DockviewReact 완전 remount, 각 탭의 layout 복원 */}
-      <DockviewReact
-        key={activeTab.id}
-        className={`workspace-dock dockview-theme-${
-          settings.theme === 'dark' ? 'abyss' : 'light'
-        }`}
-        components={components}
-        defaultTabComponent={PanelTab}
-        onReady={onReady}
-      />
+      <div ref={dockBoxRef} className="workspace-dock-box">
+        <DockviewReact
+          key={activeTab.id}
+          className={`workspace-dock dockview-theme-${
+            settings.theme === 'dark' ? 'abyss' : 'light'
+          }`}
+          components={components}
+          defaultTabComponent={PanelTab}
+          onReady={onReady}
+        />
+        {dropZone && <div className={`drop-indicator drop-${dropZone}`} />}
+      </div>
     </div>
   );
 }

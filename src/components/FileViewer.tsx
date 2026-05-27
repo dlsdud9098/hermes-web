@@ -20,6 +20,7 @@ import { loadLanguage } from '@uiw/codemirror-extensions-langs';
 import { readFile, writeFile, type FileContent } from '../api/fs';
 import { useSettings } from '../store/settings';
 import { taskCheckboxes } from './mdCheckbox';
+import { mdTableInline } from './mdTableInline';
 import { publishDraft } from '../previewBus';
 
 // 코드블록 신택스 하이라이터 1회 초기화 (lowlight)
@@ -139,6 +140,7 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
           markdownStylePlugin,
           codeBlockField({ copyButton: true }),
           tableField,
+          mdTableInline,
           taskCheckboxes,
           editorTheme,
         );
