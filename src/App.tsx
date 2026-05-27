@@ -124,8 +124,12 @@ function Shell() {
     const api = dockApiRef.current;
     if (!api || !active) return;
     const p = settings.chatProvider;
-    const comp = p === 'claude' ? 'claudecode' : p === 'codex' ? 'codex' : 'chat';
-    const label = p === 'claude' ? 'Claude' : p === 'codex' ? 'Codex' : '세션';
+    const comp = p === 'claude' ? 'claudecode'
+      : p === 'codex' ? 'codex'
+      : p === 'hermes' ? 'channel' : 'chat';
+    const label = p === 'claude' ? 'Claude'
+      : p === 'codex' ? 'Codex'
+      : p === 'hermes' ? '# 채널' : '세션';
     api.addPanel({
       id: uid('panel'),
       component: comp,

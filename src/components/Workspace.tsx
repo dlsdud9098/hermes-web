@@ -12,6 +12,7 @@ import {
 } from 'dockview';
 import 'dockview/dist/styles/dockview.css';
 import { ChatPanel } from './ChatPanel';
+import { ChannelPanel } from './ChannelPanel';
 import { PanelTab } from './PanelTab';
 import { FileViewerPanel } from './FileViewer';
 import { HtmlPreviewPanel } from './HtmlPreview';
@@ -25,7 +26,7 @@ import { useProjects, uid } from '../store/projects';
 import { useSettings } from '../store/settings';
 import type { Project } from '../types';
 
-interface ChatParams { projectId: string }
+interface ChatParams { projectId: string; initialMessage?: string }
 interface ViewerParams { filePath: string }
 interface SessionViewerParams { source: 'claude' | 'codex'; file: string }
 interface SearchParams { projectPath: string }
@@ -57,7 +58,18 @@ function emitOpenFile(filePath: string, line: number) {
 
 const components = {
   chat: (props: IDockviewPanelProps<ChatParams>) => (
-    <ChatPanel panelId={props.api.id} projectId={props.params.projectId} />
+    <ChatPanel
+      panelId={props.api.id}
+      projectId={props.params.projectId}
+      initialMessage={props.params.initialMessage}
+    />
+  ),
+  channel: (props: IDockviewPanelProps<{ projectId: string }>) => (
+    <ChannelPanel
+      panelId={props.api.id}
+      projectId={props.params.projectId}
+      getApi={() => props.containerApi as DockviewApi}
+    />
   ),
   fileviewer: (props: IDockviewPanelProps<ViewerParams>) => (
     <FileViewerPanel filePath={props.params.filePath} />
@@ -140,10 +152,14 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
 
   const seed = useCallback((api: DockviewApi) => {
     const provider = settings.chatProvider;
+    // Hermes = 채널 (디스코드 식 — 메시지가 새 스레드 시작)
+    // Claude / Codex = 기존 직접 채팅 패널
     const comp = provider === 'claude' ? 'claudecode'
-      : provider === 'codex' ? 'codex' : 'chat';
+      : provider === 'codex' ? 'codex'
+      : provider === 'hermes' ? 'channel' : 'chat';
     const label = provider === 'claude' ? 'Claude'
-      : provider === 'codex' ? 'Codex' : '세션';
+      : provider === 'codex' ? 'Codex'
+      : provider === 'hermes' ? '# 채널' : '세션';
     api.addPanel({
       id: uid('panel'),
       component: comp,

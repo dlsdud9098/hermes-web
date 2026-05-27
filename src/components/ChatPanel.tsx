@@ -35,11 +35,13 @@ function completeTool(tools: ToolCall[], tool: string, duration: number, error: 
 interface ChatPanelProps {
   panelId: string;
   projectId: string;
+  /** Hermes 채널에서 스레드 열 때 첫 자동 전송 메시지 */
+  initialMessage?: string;
 }
 
 const MAX_SKILL_RESULTS = 60;
 
-export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
+export function ChatPanel({ panelId, projectId, initialMessage }: ChatPanelProps) {
   const { messages: store, setMessages, projects } = useProjects();
   const { settings } = useSettings();
   const projectPath = projects.find((p) => p.id === projectId)?.path ?? '';
@@ -87,6 +89,18 @@ export function ChatPanel({ panelId, projectId }: ChatPanelProps) {
   useEffect(() => {
     listSkills('hermes').then(setSkills).catch(() => { /* 스킬 목록 없이 진행 */ });
   }, []);
+
+  // Hermes 채널에서 스레드 열 때 → initialMessage 자동 전송 (1회만)
+  const autoSentRef = useRef(false);
+  useEffect(() => {
+    if (autoSentRef.current) return;
+    if (!initialMessage || initialMessage.trim() === '') return;
+    if (messages.length > 0) { autoSentRef.current = true; return; } // 재오픈
+    autoSentRef.current = true;
+    const text = initialMessage.trim();
+    runTurn(text, [{ role: 'user', content: text }]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessage]);
 
   // draft 가 '/단어' 꼴이면 슬래시 쿼리, 아니면 null (공백 들어가면 닫힘)
   const slashQuery = useMemo(() => {

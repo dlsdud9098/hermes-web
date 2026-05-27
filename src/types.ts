@@ -46,6 +46,13 @@ export interface ProjectTab {
   layout: unknown | null;
 }
 
+/** Hermes 채널 안의 스레드 1건 — 한 스레드 = 한 Hermes 세션(panelId 키) */
+export interface ThreadMeta {
+  readonly id: string;           // = panelId
+  title: string;                  // 첫 user 메시지 잘라서
+  createdAtMs: number;
+}
+
 export interface Project {
   readonly id: string;
   name: string;
@@ -55,6 +62,8 @@ export interface Project {
   /** 이 프로젝트의 탭들 — 각 탭이 독립된 dockview workspace */
   tabs: ProjectTab[];
   activeTabId: string;
+  /** Hermes 채널의 스레드 목록 (생성순). chatProvider=hermes 일 때만 사용 */
+  hermesThreads?: ThreadMeta[];
   /** @deprecated 구버전 호환 — 마이그레이션에서 tabs[0].layout 으로 이동 */
   layout?: unknown | null;
 }

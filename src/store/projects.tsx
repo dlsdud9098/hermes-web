@@ -4,7 +4,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { ChatMessage, Project, ProjectTab } from '../types';
+import type { ChatMessage, Project, ProjectTab, ThreadMeta } from '../types';
 
 const COLORS = ['#7aa2f7', '#bb9af7', '#9ece6a', '#e0af68', '#f7768e', '#7dcfff'];
 const STORAGE_KEY = 'hermes-web:state:v1';
@@ -39,6 +39,12 @@ interface ProjectsContextValue {
   setMessages: (panelId: string, messages: ChatMessage[]) => void;
   /** 프로젝트의 가장 최근 활성 탭(현재 활성 직전)으로 토글. 없으면 무시 */
   cycleRecentTab: (projectId: string) => void;
+  /** Hermes 채널 — 새 스레드 추가 */
+  addHermesThread: (projectId: string, thread: ThreadMeta) => void;
+  /** Hermes 채널 — 스레드 제거 (메시지도 삭제) */
+  removeHermesThread: (projectId: string, threadId: string) => void;
+  /** Hermes 채널 — 스레드 제목 변경 */
+  renameHermesThread: (projectId: string, threadId: string, title: string) => void;
 }
 
 interface PersistedState {
@@ -211,14 +217,47 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     setMessagesState((prev) => ({ ...prev, [panelId]: msgs }));
   }, []);
 
+  const addHermesThread = useCallback((projectId: string, thread: ThreadMeta) => {
+    setProjects((prev) => prev.map((p) => p.id === projectId
+      ? { ...p, hermesThreads: [...(p.hermesThreads ?? []), thread] }
+      : p,
+    ));
+  }, []);
+
+  const removeHermesThread = useCallback((projectId: string, threadId: string) => {
+    setProjects((prev) => prev.map((p) => p.id === projectId
+      ? { ...p, hermesThreads: (p.hermesThreads ?? []).filter((t) => t.id !== threadId) }
+      : p,
+    ));
+    // 메시지도 함께 정리
+    setMessagesState((prev) => {
+      const { [threadId]: _drop, ...rest } = prev;
+      void _drop;
+      return rest;
+    });
+  }, []);
+
+  const renameHermesThread = useCallback((projectId: string, threadId: string, title: string) => {
+    setProjects((prev) => prev.map((p) => p.id === projectId
+      ? {
+          ...p,
+          hermesThreads: (p.hermesThreads ?? []).map((t) =>
+            t.id === threadId ? { ...t, title } : t),
+        }
+      : p,
+    ));
+  }, []);
+
   const value = useMemo<ProjectsContextValue>(
     () => ({
       projects, activeId, messages,
       openProject, removeProject, setActive, saveLayout,
       addTab, closeTab, setActiveTab, renameTab, setMessages, cycleRecentTab,
+      addHermesThread, removeHermesThread, renameHermesThread,
     }),
     [projects, activeId, messages, openProject, removeProject, setActive, saveLayout,
-     addTab, closeTab, setActiveTab, renameTab, setMessages, cycleRecentTab],
+     addTab, closeTab, setActiveTab, renameTab, setMessages, cycleRecentTab,
+     addHermesThread, removeHermesThread, renameHermesThread],
   );
 
   return <ProjectsContext.Provider value={value}>{children}</ProjectsContext.Provider>;
