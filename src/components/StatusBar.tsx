@@ -86,12 +86,13 @@ export function StatusBar({ panelCount }: StatusBarProps) {
   }, []);
 
   // provider 별 사용량 fetch — 60s 캐시 + 진입/전환 시 1회
+  // hermes 는 자체 quota 없음 → Codex 사용량 표시 (실용 지표)
   useEffect(() => {
     if (!isTauri) return;
     let cancelled = false;
     if (settings.chatProvider === 'claude') {
       claudeUsage(false).then((u) => { if (!cancelled) setCu(u); });
-    } else if (settings.chatProvider === 'codex') {
+    } else if (settings.chatProvider === 'codex' || settings.chatProvider === 'hermes') {
       codexUsage(false).then((u) => { if (!cancelled) setXu(u); });
     }
     return () => { cancelled = true; };
@@ -102,7 +103,7 @@ export function StatusBar({ panelCount }: StatusBarProps) {
       setLoading(true);
       setCu(await claudeUsage(true));
       setLoading(false);
-    } else if (settings.chatProvider === 'codex') {
+    } else if (settings.chatProvider === 'codex' || settings.chatProvider === 'hermes') {
       setLoading(true);
       setXu(await codexUsage(true));
       setLoading(false);
@@ -221,7 +222,7 @@ export function StatusBar({ panelCount }: StatusBarProps) {
       )}
 
       {/* Codex 사용량 */}
-      {settings.chatProvider === 'codex' && xu && (
+      {(settings.chatProvider === 'codex' || settings.chatProvider === 'hermes') && xu && (
         <>
           {xu.primary && (
             <UsagePill

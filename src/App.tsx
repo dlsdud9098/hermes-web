@@ -127,6 +127,11 @@ function Shell() {
     const comp = p === 'claude' ? 'claudecode'
       : p === 'codex' ? 'codex'
       : p === 'hermes' ? 'channel' : 'chat';
+    // Hermes 채널은 1개만 — 이미 있으면 활성화 (분할로 중복 생성 안 함)
+    if (comp === 'channel') {
+      const existing = api.panels.find((pn) => pn.view.contentComponent === 'channel');
+      if (existing) { existing.api.setActive(); return; }
+    }
     const label = p === 'claude' ? 'Claude'
       : p === 'codex' ? 'Codex'
       : p === 'hermes' ? '# 채널' : '세션';

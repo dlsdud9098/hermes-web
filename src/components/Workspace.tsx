@@ -152,11 +152,14 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
 
   const seed = useCallback((api: DockviewApi) => {
     const provider = settings.chatProvider;
-    // Hermes = 채널 (디스코드 식 — 메시지가 새 스레드 시작)
-    // Claude / Codex = 기존 직접 채팅 패널
     const comp = provider === 'claude' ? 'claudecode'
       : provider === 'codex' ? 'codex'
       : provider === 'hermes' ? 'channel' : 'chat';
+    // Hermes 채널은 이 dockview 에 1개만 — 이미 있으면 활성화
+    if (comp === 'channel') {
+      const existing = api.panels.find((p) => p.view.contentComponent === 'channel');
+      if (existing) { existing.api.setActive(); return; }
+    }
     const label = provider === 'claude' ? 'Claude'
       : provider === 'codex' ? 'Codex'
       : provider === 'hermes' ? '# 채널' : '세션';
