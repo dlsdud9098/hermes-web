@@ -24,22 +24,31 @@ function normalizeForDraft(u: string): string {
 
 interface ScreenBounds { x: number; y: number; w: number; h: number }
 
-/** 슬롯 div 의 화면 절대 좌표(logical px) 계산 — 메인창 inner pos + getBoundingClientRect */
-async function computeBounds(slot: HTMLElement): Promise<ScreenBounds | null> {
+/** 메인창 inner position + scale factor 캐시 — 매 sync 마다 Tauri IPC 안 하도록.
+ *  onMoved/onResized 이벤트 시 무효화 → 다음 호출에 갱신. */
+let cachedWinPos: { ix: number; iy: number; scale: number } | null = null;
+function invalidateWinPos(): void { cachedWinPos = null; }
+
+async function getWinPos(): Promise<{ ix: number; iy: number; scale: number } | null> {
+  if (cachedWinPos) return cachedWinPos;
   if (!isTauri) return null;
-  const r = slot.getBoundingClientRect();
-  if (r.width < 10 || r.height < 10) return null;
   try {
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
     const win = getCurrentWindow();
-    const inner = await win.innerPosition();   // physical px
+    const inner = await win.innerPosition();
     const scale = await win.scaleFactor();
-    const ix = inner.x / scale;
-    const iy = inner.y / scale;
-    return { x: ix + r.left, y: iy + r.top, w: r.width, h: r.height };
+    cachedWinPos = { ix: inner.x / scale, iy: inner.y / scale, scale };
+    return cachedWinPos;
   } catch {
     return null;
   }
+}
+
+/** 슬롯 div 의 화면 절대 좌표(logical px). 동기 — 캐시된 winPos 사용. */
+function computeBoundsSync(slot: HTMLElement, winPos: { ix: number; iy: number }): ScreenBounds | null {
+  const r = slot.getBoundingClientRect();
+  if (r.width < 10 || r.height < 10) return null;
+  return { x: winPos.ix + r.left, y: winPos.iy + r.top, w: r.width, h: r.height };
 }
 
 export function BrowserPanel({ panelId, initialUrl = '' }: Props) {
@@ -58,7 +67,9 @@ export function BrowserPanel({ panelId, initialUrl = '' }: Props) {
     const tid = window.setTimeout(async () => {
       const slot = slotRef.current;
       if (!slot || cancelled) return;
-      const b = (await computeBounds(slot)) ?? { x: 200, y: 200, w: 800, h: 600 };
+      const wp = await getWinPos();
+      const b = wp ? (computeBoundsSync(slot, wp) ?? { x: 200, y: 200, w: 800, h: 600 })
+                   : { x: 200, y: 200, w: 800, h: 600 };
       try {
         await browserCreate(panelId, url || 'https://duckduckgo.com', b);
         createdRef.current = true;
@@ -80,19 +91,21 @@ export function BrowserPanel({ panelId, initialUrl = '' }: Props) {
     void browserNavigate(panelId, url);
   }, [url, panelId]);
 
-  // 위치/크기 동기화 — ResizeObserver + 메인창 이동/리사이즈 + 100ms 폴링
+  // 위치/크기 동기화 — 이벤트 기반 + 저빈도 폴링 백업
   useEffect(() => {
     if (!isTauri) return;
     let raf: number | null = null;
     let lastJson = '';
-    const sync = async () => {
+    const sync = () => {
       if (raf) return;
       raf = requestAnimationFrame(async () => {
         raf = null;
         if (!visibleRef.current || !createdRef.current) return;
         const slot = slotRef.current;
         if (!slot) return;
-        const b = await computeBounds(slot);
+        const wp = await getWinPos();        // 캐시 — 첫 호출만 IPC
+        if (!wp) return;
+        const b = computeBoundsSync(slot, wp);
         if (!b) return;
         const json = `${b.x.toFixed(0)},${b.y.toFixed(0)},${b.w.toFixed(0)},${b.h.toFixed(0)}`;
         if (json === lastJson) return;
@@ -102,25 +115,26 @@ export function BrowserPanel({ panelId, initialUrl = '' }: Props) {
     };
 
     const el = slotRef.current;
-    const ro = el ? new ResizeObserver(() => { void sync(); }) : null;
+    const ro = el ? new ResizeObserver(sync) : null;
     if (el && ro) ro.observe(el);
 
-    const onResize = () => { void sync(); };
+    const onResize = () => { invalidateWinPos(); sync(); };
     window.addEventListener('resize', onResize);
     window.addEventListener('scroll', onResize, true);
 
-    // 메인창 move/resize 이벤트 구독
+    // 메인창 move/resize 이벤트 구독 — 캐시 무효화 + 동기화
     let unlistenMove: (() => void) | undefined;
     let unlistenResize: (() => void) | undefined;
     (async () => {
       const { getCurrentWindow } = await import('@tauri-apps/api/window');
       const win = getCurrentWindow();
-      unlistenMove = await win.onMoved(() => { void sync(); });
-      unlistenResize = await win.onResized(() => { void sync(); });
+      unlistenMove = await win.onMoved(() => { invalidateWinPos(); sync(); });
+      unlistenResize = await win.onResized(() => { invalidateWinPos(); sync(); });
     })();
 
-    // 폴링 백업 — dockview 드래그 등 native event 안 잡힐 때
-    const handle = window.setInterval(() => { void sync(); }, 150);
+    // 폴링 백업 — dockview 드래그처럼 ResizeObserver 만으론 잡기 어려운 케이스.
+    // 캐시 덕에 IPC 부담 적음 (winPos 변화 없을 때 sync 는 거의 no-op).
+    const handle = window.setInterval(sync, 500);
 
     return () => {
       if (ro) ro.disconnect();
