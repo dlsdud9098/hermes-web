@@ -168,8 +168,39 @@ export function Workspace({ project, onApiReady }: WorkspaceProps) {
     event.api.onDidAddPanel((panel) => panel.api.onDidTitleChange(persist));
   }, [project.id, activeTab.id, activeTab.layout, saveLayout, seed, onApiReady]);
 
+  // 파일 트리에서 드래그&드롭 → 파일 뷰어 패널 열기 (VSCode 식)
+  function onDragOver(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes('application/x-hermes-file')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }
+  function onDrop(e: React.DragEvent) {
+    const raw = e.dataTransfer.getData('application/x-hermes-file');
+    if (!raw) return;
+    e.preventDefault();
+    try {
+      const { path, name } = JSON.parse(raw) as { path: string; name: string };
+      const api = apiRef.current;
+      if (!api) return;
+      // 같은 파일이 이미 열려있으면 활성화만
+      const existing = api.panels.find((p) => {
+        const params = p.params as { filePath?: string } | undefined;
+        return params?.filePath === path;
+      });
+      if (existing) { existing.api.setActive(); return; }
+      api.addPanel({
+        id: uid('panel'),
+        component: 'fileviewer',
+        title: name,
+        params: { filePath: path },
+      });
+    } catch {
+      // JSON 파싱 실패 — 무시
+    }
+  }
+
   return (
-    <div className="workspace">
+    <div className="workspace" onDragOver={onDragOver} onDrop={onDrop}>
       <TabBar
         tabs={project.tabs}
         activeId={project.activeTabId}

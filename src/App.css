@@ -1543,3 +1543,7 @@
   transition: none;
 }
 .skill-item:hover { background: var(--bg-bar); }
+
+/* 드래그 가능한 파일 행 — cursor 힌트 */
+.tree-file { cursor: pointer; }
+.tree-file:active { cursor: grabbing; }
