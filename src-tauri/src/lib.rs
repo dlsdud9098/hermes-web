@@ -8,6 +8,7 @@ mod browser;
 mod claude_cli;
 mod codex_cli;
 mod fs_walk;
+mod fs_watch;
 mod search;
 mod sessions;
 mod usage;
@@ -417,6 +418,7 @@ pub fn run() {
         .manage(sessions::SessionIndex::default())
         .manage(usage::UsageCache::default())
         .manage(browser::BrowserRegistry::default())
+        .manage(fs_watch::FsWatchRegistry::default())
         .manage(accounts::AccountState::default())
         .setup(|app| {
             // 세션 인덱스 백그라운드 워밍업 — Everything 식 캐시
@@ -460,6 +462,8 @@ pub fn run() {
             browser::browser_set_visible,
             browser::browser_close,
             browser::browser_eval,
+            fs_watch::fs_watch_start,
+            fs_watch::fs_watch_stop,
             accounts::accounts_list,
             accounts::account_add_current,
             accounts::account_remove,

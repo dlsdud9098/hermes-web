@@ -8,7 +8,8 @@ import {
 } from '../api/fs';
 import { useSettings } from '../store/settings';
 import type { Settings } from '../settings';
-import { isTauri } from '../runtime';
+import { invoke, isTauri } from '../runtime';
+import { listen } from '@tauri-apps/api/event';
 
 function arrange(entries: DirEntry[], settings: Settings): DirEntry[] {
   let out = settings.showHiddenFiles
@@ -437,6 +438,25 @@ export function FileTreePanel({ rootPath, onOpenFile }: FileTreePanelProps) {
 
   const rootKey = reloadKey[rootPath] ?? 0;
   useEffect(() => { if (rootKey > 0) void reloadRoot(); }, [rootKey, reloadRoot]);
+
+  // 외부 fs 변경 실시간 감지 — Rust notify watcher 가 이벤트 보내면 영향 디렉토리 reload
+  useEffect(() => {
+    if (!isTauri || !rootPath) return;
+    let cancelled = false;
+    let unlisten: (() => void) | undefined;
+    const watchId = `fs-${rootPath}`;
+    invoke('fs_watch_start', { projectId: watchId, root: rootPath })
+      .catch((e) => { console.error('[fs_watch_start]', e); });
+    listen<{ project_id: string; dirs: string[] }>('fs:changed', (ev) => {
+      if (cancelled || ev.payload.project_id !== watchId) return;
+      for (const d of ev.payload.dirs) bumpReload(d);
+    }).then((u) => { unlisten = u; });
+    return () => {
+      cancelled = true;
+      if (unlisten) unlisten();
+      void invoke('fs_watch_stop', { projectId: watchId });
+    };
+  }, [rootPath, bumpReload]);
 
   const ctx: TreeCtx = {
     clipboard, setClipboard, bumpReload, reloadKey,
