@@ -96,29 +96,46 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
           return;
         }
         const view = viewRef.current;
-        const sc = view?.scrollDOM;
-        const savedTop = sc?.scrollTop ?? 0;
-        const atBottom = sc
-          ? sc.scrollHeight - sc.scrollTop - sc.clientHeight <= SCROLL_BOTTOM_THRESHOLD
-          : false;
+        if (!view) {
+          setData(fresh);
+          setDraft(fresh.content);
+          return;
+        }
+        const sc = view.scrollDOM;
+        const savedTop = sc.scrollTop;
+        const atBottom = sc.scrollHeight - sc.scrollTop - sc.clientHeight <= SCROLL_BOTTOM_THRESHOLD;
+        // 직접 dispatch — selection 유지, scrollIntoView=false.
+        // @uiw/react-codemirror 가 value prop 변경 감지해 또 dispatch 하는 걸 피하려고
+        // doc 을 먼저 새 content 와 일치시킨다.
+        const docLen = view.state.doc.length;
+        // selection 이 새 doc 길이 초과면 끝으로 클램프
+        const selFrom = Math.min(view.state.selection.main.from, fresh.content.length);
+        const selTo = Math.min(view.state.selection.main.to, fresh.content.length);
+        view.dispatch({
+          changes: { from: 0, to: docLen, insert: fresh.content },
+          selection: { anchor: selFrom, head: selTo },
+          scrollIntoView: false,
+        });
         setData(fresh);
         setDraft(fresh.content);
-        // 외부 수정 (AI 에이전트 등) 시 viewport 점프 방지
-        requestAnimationFrame(() => {
-          const v = viewRef.current;
-          const vsc = v?.scrollDOM;
-          if (!v || !vsc) return;
-          if (atBottom) {
-            // 끝에 있었으면 끝 따라가기
+        // 스크롤 위치 강제 보존 (CodeMirror 가 layout 후 재계산해도 덮어씀)
+        if (atBottom) {
+          requestAnimationFrame(() => {
+            const v = viewRef.current;
+            if (!v) return;
             v.dispatch({
               selection: { anchor: v.state.doc.length },
               scrollIntoView: true,
             });
-          } else {
-            // 아니면 이전 스크롤 위치 복원 — value 교체로 viewport 가 점프하는 거 방지
-            vsc.scrollTop = savedTop;
-          }
-        });
+          });
+        } else {
+          sc.scrollTop = savedTop;
+          // 다음 두 프레임에 걸쳐 한 번 더 복원 — layout 시점 차이 보정
+          requestAnimationFrame(() => { sc.scrollTop = savedTop; });
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => { sc.scrollTop = savedTop; }),
+          );
+        }
       } catch {
         // 파일 회전/일시 사라짐 등 — 다음 tick 에 재시도
       }
