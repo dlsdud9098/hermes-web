@@ -15,6 +15,7 @@ import {
   livePreviewPlugin, markdownStylePlugin, editorTheme,
   mouseSelectingField, collapseOnSelectionFacet,
   codeBlockField, tableField, initHighlighter,
+  setMouseSelecting,
 } from 'codemirror-live-markdown';
 import { loadLanguage } from '@uiw/codemirror-extensions-langs';
 import { readFile, writeFile, type FileContent } from '../api/fs';
@@ -62,12 +63,27 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   }, [filePath]);
 
+  // 초기 렌더 트리거 — codemirror-live-markdown 의 mouseSelectingField 가
+  // 가끔 첫 mount 시 잘못된 상태에 있어 클릭 전까지 source 모드로 표시됨.
+  // 콘텐츠 로드된 직후 setMouseSelecting(false) 디스패치 → 디코레이션 재평가.
+  useEffect(() => {
+    if (!data || !isMarkdown || !settings.mdLivePreview) return;
+    const view = viewRef.current;
+    if (!view) return;
+    // 다음 프레임에 dispatch — 에디터가 새 content 처리 후 안전하게
+    const id = requestAnimationFrame(() => {
+      view.dispatch({ effects: setMouseSelecting.of(false) });
+    });
+    return () => cancelAnimationFrame(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+
   // VSCode 식 자동 따라가기 — 파일 변화 항상 감지.
   // 사용자가 스크롤을 끝에 두면 새 내용을 받아서 끝으로 따라감.
   // 위로 스크롤해 보고 있으면 위치 유지 (자동 점프 안 함).
   useEffect(() => {
     let cancelled = false;
-    const SCROLL_BOTTOM_THRESHOLD = 8; // px — 스크롤이 끝에서 8px 이내면 '끝' 으로 간주
+    const SCROLL_BOTTOM_THRESHOLD = 8;
     const tick = async () => {
       if (cancelled) return;
       try {
@@ -81,22 +97,28 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
         }
         const view = viewRef.current;
         const sc = view?.scrollDOM;
+        const savedTop = sc?.scrollTop ?? 0;
         const atBottom = sc
           ? sc.scrollHeight - sc.scrollTop - sc.clientHeight <= SCROLL_BOTTOM_THRESHOLD
           : false;
         setData(fresh);
         setDraft(fresh.content);
-        if (atBottom && view) {
-          // 다음 프레임에 끝으로 — 컨텐츠 반영 후 스크롤
-          requestAnimationFrame(() => {
-            const v = viewRef.current;
-            if (!v) return;
+        // 외부 수정 (AI 에이전트 등) 시 viewport 점프 방지
+        requestAnimationFrame(() => {
+          const v = viewRef.current;
+          const vsc = v?.scrollDOM;
+          if (!v || !vsc) return;
+          if (atBottom) {
+            // 끝에 있었으면 끝 따라가기
             v.dispatch({
               selection: { anchor: v.state.doc.length },
               scrollIntoView: true,
             });
-          });
-        }
+          } else {
+            // 아니면 이전 스크롤 위치 복원 — value 교체로 viewport 가 점프하는 거 방지
+            vsc.scrollTop = savedTop;
+          }
+        });
       } catch {
         // 파일 회전/일시 사라짐 등 — 다음 tick 에 재시도
       }
