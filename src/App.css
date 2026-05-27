@@ -1551,7 +1551,8 @@
 /* GFM 테이블 렌더링 — codemirror-live-markdown tableField */
 .cm-content .cm-table-widget {
   width: 100%;
-  overflow-x: hidden;
+  /* 헤더/1열 nowrap 으로 강제할 때 진짜 부족하면 스크롤 — 일반 케이스는 fit */
+  overflow-x: auto;
 }
 .cm-content table {
   border-collapse: collapse;
@@ -1564,11 +1565,19 @@
 .cm-content table td {
   border: 1px solid var(--border);
   padding: 4px 10px;
-  /* 셀 내용 자동 줄바꿈 — 가로 스크롤 없이 보이는 폭에 맞춤 */
+  vertical-align: top;
+  /* 기본 셀 — 보이는 폭에 맞춰 자동 줄바꿈 */
   word-break: break-word;
   overflow-wrap: anywhere;
   white-space: normal;
-  vertical-align: top;
+}
+/* 헤더 + 첫 열은 최대한 한 줄 + 가운데 정렬 (인라인 style align 있으면 그게 우선) */
+.cm-content table th,
+.cm-content table td:first-child {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  text-align: center;
 }
 .cm-content table th {
   background: var(--bg-bar);
