@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useProjects } from '../store/projects';
+import { useSettings } from '../store/settings';
 import { FileTreePanel } from './FileTree';
 import type { DirEntry } from '../api/fs';
 
@@ -11,6 +12,8 @@ interface ProjectRailProps {
   onOpenFile: (file: DirEntry) => void;
   onOpenSettings: () => void;
   onOpenSessions: () => void;
+  onOpenKanban: () => void;
+  onOpenHermesConfig: () => void;
   treeOpen: boolean;
   setTreeOpen: (next: boolean | ((prev: boolean) => boolean)) => void;
 }
@@ -29,9 +32,13 @@ function loadWidth(): number {
 }
 
 export function ProjectRail({
-  onOpenFolder, onOpenFile, onOpenSettings, onOpenSessions, treeOpen, setTreeOpen,
+  onOpenFolder, onOpenFile, onOpenSettings, onOpenSessions,
+  onOpenKanban, onOpenHermesConfig,
+  treeOpen, setTreeOpen,
 }: ProjectRailProps) {
   const { projects, activeId, setActive, removeProject } = useProjects();
+  const { settings } = useSettings();
+  const isHermes = settings.chatProvider === 'hermes';
   const [width, setWidth] = useState<number>(() => loadWidth());
 
   // 너비 변경 시 localStorage 영속 (디바운스 안 해도 가벼움)
@@ -108,6 +115,22 @@ export function ProjectRail({
           +
         </button>
       </div>
+      <button
+        className="rail-settings"
+        onClick={onOpenKanban}
+        title="Kanban 보드 (Hermes tasks) — 토글"
+      >
+        📋
+      </button>
+      {isHermes && (
+        <button
+          className="rail-settings"
+          onClick={onOpenHermesConfig}
+          title="Hermes 전용 — 스킬 / 메모리"
+        >
+          🜲
+        </button>
+      )}
       <button className="rail-settings" onClick={onOpenSessions} title="세션 기록 (Claude/Codex)">
         📜
       </button>

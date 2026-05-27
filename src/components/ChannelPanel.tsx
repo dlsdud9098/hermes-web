@@ -10,6 +10,8 @@ import { DockviewApi } from 'dockview';
 import { useProjects, uid } from '../store/projects';
 import { useSettings } from '../store/settings';
 import type { ThreadMeta } from '../types';
+import { createKanban } from '../api/kanban';
+import { isTauri } from '../runtime';
 
 interface Props {
   panelId: string;            // 채널 패널 자체 id (안 쓰지만 dockview prop)
@@ -63,6 +65,11 @@ export function ChannelPanel({ projectId, getApi }: Props) {
     addHermesThread(projectId, meta);
     setDraft('');
     openThread(meta, text);
+    // 스레드 = kanban task. session_id 로 연결.
+    if (isTauri) {
+      createKanban({ title, body: text, session_id: threadId })
+        .catch(() => { /* kanban.db 없으면 무시 — `hermes kanban init` 권장 */ });
+    }
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {

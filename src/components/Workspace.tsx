@@ -21,6 +21,7 @@ import { SearchPanel } from './SearchPanel';
 import { ClaudeCodePanel } from './ClaudeCodePanel';
 import { CodexPanel } from './CodexPanel';
 import { BrowserPanel } from './BrowserPanel';
+import { KanbanPanel } from './KanbanPanel';
 import { TabBar } from './TabBar';
 import { useProjects, uid } from '../store/projects';
 import { useSettings } from '../store/settings';
@@ -92,6 +93,7 @@ const components = {
   browser: (props: IDockviewPanelProps<{ url?: string }>) => (
     <BrowserPanel panelId={props.api.id} initialUrl={props.params.url ?? ''} />
   ),
+  kanban: () => <KanbanPanel />,
 };
 
 interface WorkspaceProps {

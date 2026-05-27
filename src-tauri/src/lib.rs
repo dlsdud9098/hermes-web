@@ -10,6 +10,7 @@ mod codex_cli;
 mod fs_walk;
 mod fs_watch;
 mod hermes_launch;
+mod kanban;
 mod search;
 mod sessions;
 mod usage;
@@ -381,6 +382,34 @@ fn builtin_codex_commands() -> Vec<Skill> {
     items.into_iter().map(|(n, d)| Skill { name: n.into(), description: d.into() }).collect()
 }
 
+// Hermes 전용: ~/.hermes/memories/USER.md 읽기/쓰기 — 시스템 메모리 편집
+#[derive(Serialize)]
+struct HermesMemory {
+    path: String,
+    content: String,
+    exists: bool,
+}
+
+#[tauri::command]
+fn hermes_memory_read() -> Result<HermesMemory, String> {
+    let home = dirs::home_dir().ok_or_else(|| "홈 디렉토리 미확인".to_string())?;
+    let p = home.join(".hermes").join("memories").join("USER.md");
+    let path = p.to_string_lossy().to_string();
+    if !p.exists() {
+        return Ok(HermesMemory { path, content: String::new(), exists: false });
+    }
+    let content = fs::read_to_string(&p).map_err(|e| e.to_string())?;
+    Ok(HermesMemory { path, content, exists: true })
+}
+
+#[tauri::command]
+fn hermes_memory_write(content: String) -> Result<(), String> {
+    let home = dirs::home_dir().ok_or_else(|| "홈 디렉토리 미확인".to_string())?;
+    let dir = home.join(".hermes").join("memories");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    fs::write(dir.join("USER.md"), content).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn provider_skills(source: String) -> Result<SkillList, String> {
     let home = dirs::home_dir().ok_or_else(|| "홈 디렉토리 미확인".to_string())?;
@@ -421,6 +450,7 @@ pub fn run() {
         .manage(browser::BrowserRegistry::default())
         .manage(fs_watch::FsWatchRegistry::default())
         .manage(hermes_launch::HermesProcess::default())
+        .manage(kanban::KanbanDb::default())
         .manage(accounts::AccountState::default())
         .setup(|app| {
             use tauri::Manager;
@@ -446,6 +476,8 @@ pub fn run() {
             fs_new_file,
             fs_skills,
             provider_skills,
+            hermes_memory_read,
+            hermes_memory_write,
             fs_walk::fs_walk,
             sessions::sessions_list,
             sessions::sessions_refresh,
@@ -473,6 +505,15 @@ pub fn run() {
             fs_watch::fs_watch_stop,
             hermes_launch::hermes_status,
             hermes_launch::hermes_restart,
+            kanban::kanban_list,
+            kanban::kanban_create,
+            kanban::kanban_move,
+            kanban::kanban_delete,
+            kanban::kanban_edit,
+            kanban::kanban_detail,
+            kanban::kanban_comment,
+            kanban::kanban_diff,
+            kanban::kanban_cleanup,
             accounts::accounts_list,
             accounts::account_add_current,
             accounts::account_remove,

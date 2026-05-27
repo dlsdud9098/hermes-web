@@ -7,6 +7,7 @@ import { Workspace } from './components/Workspace';
 import { FolderPicker } from './components/FolderPicker';
 import { SettingsModal } from './components/SettingsModal';
 import { SessionBrowser } from './components/SessionBrowser';
+import { HermesConfigModal } from './components/HermesConfigModal';
 import { CommandPalette, type Command } from './components/CommandPalette';
 import { QuickOpen } from './components/QuickOpen';
 import { StatusBar } from './components/StatusBar';
@@ -26,6 +27,7 @@ function Shell() {
     'appearance' | 'chat' | 'editor' | 'files' | 'keys' | 'accounts'
   >('appearance');
   const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [hermesConfigOpen, setHermesConfigOpen] = useState(false);
   const [treeOpen, setTreeOpen] = useState(true);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [quickOpenOpen, setQuickOpenOpen] = useState(false);
@@ -112,6 +114,23 @@ function Shell() {
   }, [active]);
 
   const openFolderPicker = useCallback(() => setPickerOpen(true), []);
+
+  // Kanban 토글 — 활성 dockview 에 'kanban' 패널 있으면 close, 없으면 add
+  const toggleKanban = useCallback(() => {
+    const api = dockApiRef.current;
+    if (!api) return;
+    const existing = api.panels.find((p) => p.view.contentComponent === 'kanban');
+    if (existing) {
+      existing.api.close();
+    } else {
+      api.addPanel({
+        id: uid('panel'),
+        component: 'kanban',
+        title: '📋 Kanban',
+        params: {},
+      });
+    }
+  }, []);
 
   // 탭 추가는 store 의 addTab — Workspace 가 탭 전환을 감지해 dockview remount
   const newTab = useCallback(() => {
@@ -274,6 +293,8 @@ function Shell() {
         onOpenFolder={() => setPickerOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenSessions={() => setSessionsOpen(true)}
+        onOpenKanban={toggleKanban}
+        onOpenHermesConfig={() => setHermesConfigOpen(true)}
         onOpenFile={(file) => {
           dockApiRef.current?.addPanel({
             id: uid('panel'),
@@ -330,6 +351,9 @@ function Shell() {
             });
           }}
         />
+      )}
+      {hermesConfigOpen && (
+        <HermesConfigModal onClose={() => setHermesConfigOpen(false)} />
       )}
       {paletteOpen && (
         <CommandPalette
