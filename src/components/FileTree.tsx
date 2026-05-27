@@ -1,7 +1,7 @@
 // 프로젝트 폴더를 트리로. 폴더 클릭 시 지연 로드.
 // 숨김/정렬은 설정. 우클릭 메뉴 — 복사/잘라내기/붙여넣기/이름/삭제/새파일/새폴더/경로복사.
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   listDir, fsCopy, fsMove, fsRename, fsDelete, fsMkdir, fsNewFile,
   type DirEntry, type DirListing,
@@ -202,6 +202,8 @@ function DirNode({ entry, depth, onOpenFile, parentDir }: DirNodeProps) {
   const [open, setOpen] = useState(false);
   const [listing, setListing] = useState<DirListing | null>(null);
   const [error, setError] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const expandTimer = useRef<number | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -211,7 +213,6 @@ function DirNode({ entry, depth, onOpenFile, parentDir }: DirNodeProps) {
     }
   }, [entry.path]);
 
-  // 외부 트리거로 재로드 (자식 변경 후)
   const localKey = tree.reloadKey[entry.path] ?? 0;
   useEffect(() => {
     if (open && localKey > 0) void reload();
@@ -227,6 +228,14 @@ function DirNode({ entry, depth, onOpenFile, parentDir }: DirNodeProps) {
       }
     }
     setOpen((o) => !o);
+  }
+
+  async function expandIfClosed() {
+    if (open) return;
+    if (!listing) {
+      try { setListing(await listDir(entry.path)); } catch { setError(true); return; }
+    }
+    setOpen(true);
   }
 
   function onCtx(e: React.MouseEvent) {
@@ -249,10 +258,85 @@ function DirNode({ entry, depth, onOpenFile, parentDir }: DirNodeProps) {
   const cutClass = tree.clipboard?.op === 'cut' && tree.clipboard.paths.includes(entry.path)
     ? ' tree-row-cut' : '';
 
+  // 드래그 페이로드 파싱
+  function readPayload(e: React.DragEvent): { path: string; name: string } | null {
+    const raw = e.dataTransfer.getData('application/x-hermes-file');
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+  function isSelfOrDescendant(srcPath: string): boolean {
+    return srcPath === entry.path || entry.path.startsWith(srcPath + '/')
+      || entry.path.startsWith(srcPath + '\\');
+  }
+
   return (
     <>
-      <button className={`tree-row${cutClass}`} style={{ paddingLeft: pad }}
-        onClick={toggle} onContextMenu={onCtx}>
+      <button
+        className={`tree-row${cutClass}${dragOver ? ' tree-row-dragover' : ''}`}
+        style={{ paddingLeft: pad }}
+        onClick={toggle}
+        onContextMenu={onCtx}
+        // 드래그 시작 — 폴더 자체도 이동 가능
+        draggable
+        onDragStart={(e) => {
+          e.stopPropagation();
+          e.dataTransfer.setData('application/x-hermes-file', JSON.stringify({
+            path: entry.path, name: entry.name,
+          }));
+          e.dataTransfer.setData('text/plain', entry.path);
+          e.dataTransfer.effectAllowed = 'move';
+        }}
+        // 폴더 위에 드래그 → 폴더 안으로 들어갈 후보
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes('application/x-hermes-file')) return;
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = 'move';
+          setDragOver(true);
+          // 닫혀있으면 600ms hover 후 자동 펼침 (VSCode 식 spring-load)
+          if (!open && !expandTimer.current) {
+            expandTimer.current = window.setTimeout(() => {
+              expandTimer.current = null;
+              void expandIfClosed();
+            }, 600);
+          }
+        }}
+        onDragLeave={(e) => {
+          e.stopPropagation();
+          setDragOver(false);
+          if (expandTimer.current) {
+            window.clearTimeout(expandTimer.current);
+            expandTimer.current = null;
+          }
+        }}
+        onDrop={(e) => {
+          if (expandTimer.current) {
+            window.clearTimeout(expandTimer.current);
+            expandTimer.current = null;
+          }
+          setDragOver(false);
+          const payload = readPayload(e);
+          if (!payload) return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (isSelfOrDescendant(payload.path)) {
+            window.alert('자기 자신 또는 하위로 이동 불가');
+            return;
+          }
+          (async () => {
+            try {
+              await fsMove(payload.path, entry.path);
+              // src 의 부모 + 이 폴더 둘 다 재로드
+              const srcParent = payload.path.replace(/[/\\][^/\\]+$/, '');
+              tree.bumpReload(srcParent);
+              tree.bumpReload(entry.path);
+              await reload();
+            } catch (err) {
+              window.alert(`이동 실패: ${err instanceof Error ? err.message : String(err)}`);
+            }
+          })();
+        }}
+      >
         <span className="tree-caret">{open ? '▾' : '▸'}</span>
         <span className="tree-ic">📁</span>
         {entry.name}{error && ' ⚠'}
@@ -364,7 +448,6 @@ export function FileTreePanel({ rootPath, onOpenFile }: FileTreePanelProps) {
     <TreeContext.Provider value={ctx}>
       <div className="filetree"
         onContextMenu={(e) => {
-          // 빈 영역 우클릭 — 루트 메뉴
           if (e.target === e.currentTarget && isTauri) {
             e.preventDefault();
             setMenu({
@@ -377,6 +460,31 @@ export function FileTreePanel({ rootPath, onOpenFile }: FileTreePanelProps) {
               }),
             });
           }
+        }}
+        // 빈 영역 드롭 → 프로젝트 루트로 이동
+        onDragOver={(e) => {
+          if (!e.dataTransfer.types.includes('application/x-hermes-file')) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }}
+        onDrop={(e) => {
+          const raw = e.dataTransfer.getData('application/x-hermes-file');
+          if (!raw) return;
+          e.preventDefault();
+          try {
+            const { path } = JSON.parse(raw) as { path: string; name: string };
+            const parent = path.replace(/[/\\][^/\\]+$/, '');
+            if (parent === rootPath) return; // 이미 루트에 있음
+            (async () => {
+              try {
+                await fsMove(path, rootPath);
+                bumpReload(parent);
+                bumpReload(rootPath);
+              } catch (err) {
+                window.alert(`이동 실패: ${err instanceof Error ? err.message : String(err)}`);
+              }
+            })();
+          } catch { /* 무시 */ }
         }}
       >
         {error && <div className="chat-error">⚠ {error}</div>}

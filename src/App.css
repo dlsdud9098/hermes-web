@@ -1764,3 +1764,10 @@
   padding: 6px 8px;
 }
 .channel-composer textarea:focus { outline: 1px solid var(--accent); }
+
+/* 트리 — 드롭 타깃 폴더 강조 */
+.tree-row-dragover {
+  background: rgba(122, 162, 247, 0.18) !important;
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
