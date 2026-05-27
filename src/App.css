@@ -1530,3 +1530,16 @@
   from { opacity: 0; transform: translateX(20px); }
   to { opacity: 1; transform: translateX(0); }
 }
+
+/* 슬래시 메뉴 — 스크롤 렉 방지 격리 */
+.skill-menu {
+  contain: layout paint style;
+  will-change: scroll-position;
+  overflow-anchor: none;
+}
+.skill-item {
+  contain: layout paint;
+  /* 의도적으로 transition 제거 — 스크롤 중 hover 변화로 인한 페인트 절약 */
+  transition: none;
+}
+.skill-item:hover { background: var(--bg-bar); }
