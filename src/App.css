@@ -1547,3 +1547,19 @@
 /* 드래그 가능한 파일 행 — cursor 힌트 */
 .tree-file { cursor: pointer; }
 .tree-file:active { cursor: grabbing; }
+
+/* GFM 테이블 렌더링 — codemirror-live-markdown tableField */
+.cm-content table {
+  border-collapse: collapse;
+  margin: 6px 0;
+  font-size: 12px;
+}
+.cm-content table th,
+.cm-content table td {
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+}
+.cm-content table th {
+  background: var(--bg-bar);
+  font-weight: 600;
+}

@@ -14,7 +14,7 @@ import { GFM } from '@lezer/markdown';
 import {
   livePreviewPlugin, markdownStylePlugin, editorTheme,
   mouseSelectingField, collapseOnSelectionFacet,
-  codeBlockField, initHighlighter,
+  codeBlockField, tableField, initHighlighter,
 } from 'codemirror-live-markdown';
 import { loadLanguage } from '@uiw/codemirror-extensions-langs';
 import { readFile, writeFile, type FileContent } from '../api/fs';
@@ -138,6 +138,7 @@ export function FileViewerPanel({ filePath }: { filePath: string }) {
           livePreviewPlugin,
           markdownStylePlugin,
           codeBlockField({ copyButton: true }),
+          tableField,
           taskCheckboxes,
           editorTheme,
         );
