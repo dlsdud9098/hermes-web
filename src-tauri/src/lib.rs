@@ -9,6 +9,7 @@ mod claude_cli;
 mod codex_cli;
 mod fs_walk;
 mod fs_watch;
+mod hermes_launch;
 mod search;
 mod sessions;
 mod usage;
@@ -419,12 +420,18 @@ pub fn run() {
         .manage(usage::UsageCache::default())
         .manage(browser::BrowserRegistry::default())
         .manage(fs_watch::FsWatchRegistry::default())
+        .manage(hermes_launch::HermesProcess::default())
         .manage(accounts::AccountState::default())
         .setup(|app| {
+            use tauri::Manager;
             // 세션 인덱스 백그라운드 워밍업 — Everything 식 캐시
             sessions::start_indexer(app.handle().clone());
             // 계정 자동 로테이션 백그라운드 루프 (90초 주기)
             accounts::start_rotation_task(app.handle().clone());
+            // Hermes gateway 자동 launch — :8642 응답 없으면 spawn
+            if let Some(proc_state) = app.try_state::<hermes_launch::HermesProcess>() {
+                hermes_launch::ensure_started(&proc_state);
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -464,6 +471,8 @@ pub fn run() {
             browser::browser_eval,
             fs_watch::fs_watch_start,
             fs_watch::fs_watch_stop,
+            hermes_launch::hermes_status,
+            hermes_launch::hermes_restart,
             accounts::accounts_list,
             accounts::account_add_current,
             accounts::account_remove,
@@ -474,13 +483,14 @@ pub fn run() {
             accounts::account_auto_rotate_set,
         ])
         .on_window_event(|window, event| {
-            // 창 닫히면 모든 Claude PTY 세션 일괄 정리 — 좀비 프로세스 방지
+            // 창 닫히면 자식 프로세스들 정리 — 좀비 방지
             use tauri::Manager;
             if let tauri::WindowEvent::Destroyed = event {
-                if let Some(sessions) =
-                    window.try_state::<claude_cli::ClaudeSessions>()
-                {
+                if let Some(sessions) = window.try_state::<claude_cli::ClaudeSessions>() {
                     claude_cli::kill_all(&sessions);
+                }
+                if let Some(proc_state) = window.try_state::<hermes_launch::HermesProcess>() {
+                    hermes_launch::kill_managed(&proc_state);
                 }
             }
         })
