@@ -385,16 +385,15 @@ function FileRow({ entry, depth, onOpenFile, parentDir }: {
       style={{ paddingLeft: depth * 12 + 8 + 14 }}
       onClick={() => onOpenFile(entry)}
       onContextMenu={onCtx}
-      // 드래그 시작 — 워크스페이스 dockview 에서 drop 받아 파일 뷰어로 연다
+      // 드래그 시작 — 워크스페이스 dockview (copy) + 폴더 트리 (move) 양쪽 호환
       draggable
       onDragStart={(e) => {
-        // 두 포맷 모두 — 'application/x-hermes-file' 는 우리 자체 인식,
-        // 'text/plain' 은 외부 앱 (텍스트 에디터 등) 으로 드래그 가능
         e.dataTransfer.setData('application/x-hermes-file', JSON.stringify({
           path: entry.path, name: entry.name,
         }));
         e.dataTransfer.setData('text/plain', entry.path);
-        e.dataTransfer.effectAllowed = 'copy';
+        // copyMove — 받는 쪽이 'copy' 든 'move' 든 둘 다 허용
+        e.dataTransfer.effectAllowed = 'copyMove';
       }}
     >
       <span className="tree-ic">📄</span>
