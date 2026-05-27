@@ -1034,53 +1034,121 @@
 }
 .tabbar-add:hover { color: var(--accent); border-color: var(--accent); }
 
-/* ────────────── CodeMirror 파일 내 검색 패널 ────────────── */
-.cm-panels.cm-panels-top { border-bottom: 1px solid var(--border); }
+/* ────────────── CodeMirror 파일 내 검색 패널 (VSCode 식 우상단 카드) ────────────── */
+.fileviewer-body .cm-editor { position: relative; }
+.cm-panels {
+  background: transparent !important;
+  border: 0 !important;
+}
+.cm-panels.cm-panels-top {
+  position: absolute;
+  top: 8px;
+  right: 16px;
+  left: auto;
+  z-index: 50;
+  width: auto;
+  max-width: 480px;
+  min-width: 380px;
+  border-bottom: 0 !important;
+}
 .cm-search.cm-panel {
   background: var(--bg-panel);
   color: var(--text);
-  border-bottom: 1px solid var(--border);
-  padding: 6px 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  grid-template-rows: auto auto auto;
+  gap: 6px 6px;
   align-items: center;
-  font-size: 12px;
+  font-size: 13px;
 }
-.cm-search input,
-.cm-search input[type="text"],
-.cm-search input[type="search"] {
-  background: var(--bg, #fff);
+/* 검색 입력 — 첫 행 좌측 가장 크게 */
+.cm-search input.cm-textfield,
+.cm-search input[name="search"] {
+  grid-column: 1;
+  width: 100%;
+  background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 12px;
+  padding: 6px 10px;
+  font-size: 13px;
   outline: none;
 }
-.cm-search input:focus { border-color: var(--accent); }
+.cm-search input[name="replace"] {
+  grid-column: 1;
+  width: 100%;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 13px;
+  outline: none;
+}
+.cm-search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(122, 162, 247, 0.25);
+}
 .cm-search button {
   background: transparent;
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 2px 8px;
+  padding: 5px 10px;
   font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
+  white-space: nowrap;
+  min-height: 28px;
 }
-.cm-search button:hover { border-color: var(--accent); color: var(--accent); }
+.cm-search button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--bg-bar);
+}
+.cm-search button:active {
+  background: var(--accent);
+  color: #fff;
+}
 .cm-search label {
-  color: var(--text);
+  color: var(--text-dim);
   font-size: 12px;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
 }
-.cm-search label input[type="checkbox"] { accent-color: var(--accent); }
+.cm-search label input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+/* 닫기 X — 우상단 */
 .cm-search [name="close"] {
-  border: none;
-  font-size: 16px;
+  grid-column: 4;
+  grid-row: 1;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 18px;
   line-height: 1;
+  padding: 4px 8px;
+  min-height: auto;
+}
+.cm-search [name="close"]:hover {
+  color: var(--accent);
+  background: transparent;
+}
+/* 어두운 테마 — 그림자 + 보더 가시성 보강 */
+[data-theme="dark"] .cm-search.cm-panel {
+  box-shadow: 0 6px 32px rgba(0, 0, 0, 0.55);
 }
 
 /* ── 상태바 ───────────────────────────── */
