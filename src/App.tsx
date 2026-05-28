@@ -132,6 +132,23 @@ function Shell() {
     }
   }, []);
 
+  // Hermes 채널 토글 — provider=hermes 일 때만 의미 있음 (1개만 유지)
+  const toggleChannel = useCallback(() => {
+    const api = dockApiRef.current;
+    if (!api || !active) return;
+    const existing = api.panels.find((p) => p.view.contentComponent === 'channel');
+    if (existing) {
+      existing.api.close();
+    } else {
+      api.addPanel({
+        id: uid('panel'),
+        component: 'channel',
+        title: '# 채널',
+        params: { projectId: active.id },
+      });
+    }
+  }, [active]);
+
   // 탭 추가는 store 의 addTab — Workspace 가 탭 전환을 감지해 dockview remount
   const newTab = useCallback(() => {
     if (!active) return;
@@ -294,6 +311,7 @@ function Shell() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenSessions={() => setSessionsOpen(true)}
         onOpenKanban={toggleKanban}
+        onToggleChannel={toggleChannel}
         onOpenHermesConfig={() => setHermesConfigOpen(true)}
         onOpenFile={(file) => {
           dockApiRef.current?.addPanel({

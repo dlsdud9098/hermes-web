@@ -13,6 +13,7 @@ interface ProjectRailProps {
   onOpenSettings: () => void;
   onOpenSessions: () => void;
   onOpenKanban: () => void;
+  onToggleChannel: () => void;
   onOpenHermesConfig: () => void;
   treeOpen: boolean;
   setTreeOpen: (next: boolean | ((prev: boolean) => boolean)) => void;
@@ -33,7 +34,7 @@ function loadWidth(): number {
 
 export function ProjectRail({
   onOpenFolder, onOpenFile, onOpenSettings, onOpenSessions,
-  onOpenKanban, onOpenHermesConfig,
+  onOpenKanban, onToggleChannel, onOpenHermesConfig,
   treeOpen, setTreeOpen,
 }: ProjectRailProps) {
   const { projects, activeId, setActive, removeProject } = useProjects();
@@ -123,13 +124,22 @@ export function ProjectRail({
         📋
       </button>
       {isHermes && (
-        <button
-          className="rail-settings"
-          onClick={onOpenHermesConfig}
-          title="Hermes 전용 — 스킬 / 메모리"
-        >
-          🜲
-        </button>
+        <>
+          <button
+            className="rail-settings"
+            onClick={onToggleChannel}
+            title="Hermes 채널 — 토글"
+          >
+            #
+          </button>
+          <button
+            className="rail-settings"
+            onClick={onOpenHermesConfig}
+            title="Hermes 전용 — 스킬 / 메모리"
+          >
+            🜲
+          </button>
+        </>
       )}
       <button className="rail-settings" onClick={onOpenSessions} title="세션 기록 (Claude/Codex)">
         📜

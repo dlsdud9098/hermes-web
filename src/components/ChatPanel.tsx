@@ -49,6 +49,11 @@ export function ChatPanel({ panelId, projectId, initialMessage }: ChatPanelProps
   const [draft, setDraft] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 스트리밍 중 받은 send 들을 쌓아두는 큐 — 현 턴 끝나면 자동 플러시
+  const queueRef = useRef<Array<{ text: string; imgs: ImageAttachment[] }>>([]);
+  const [queueCount, setQueueCount] = useState(0);
+  // 최신 messages 를 큐 플러시 시점에 읽으려고 ref 로 미러링
+  const messagesRef = useRef<ChatMessage[]>(messages);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skillIndex, setSkillIndex] = useState(0);
   const [menuDismissed, setMenuDismissed] = useState(false);
@@ -77,7 +82,7 @@ export function ChatPanel({ panelId, projectId, initialMessage }: ChatPanelProps
   }
 
   // 로컬 상태 → store 동기화 (패널 remount 시에도 히스토리 유지)
-  useEffect(() => { setMessages(panelId, messages); }, [messages, panelId, setMessages]);
+  useEffect(() => { setMessages(panelId, messages); messagesRef.current = messages; }, [messages, panelId, setMessages]);
 
   useEffect(() => {
     if (settings.autoScroll) {
@@ -191,15 +196,37 @@ export function ChatPanel({ panelId, projectId, initialMessage }: ChatPanelProps
       setStreaming(false);
       setPendingApproval(null);
       abortRef.current = null;
+      // 큐에 쌓인 메시지 자동 플러시 — Discord 식 연속 전송
+      if (queueRef.current.length > 0) {
+        const next = queueRef.current.shift()!;
+        setQueueCount(queueRef.current.length);
+        setTimeout(() => {
+          const base = messagesRef.current;
+          runTurn(
+            next.text,
+            [...base, { role: 'user', content: next.text, attachments: next.imgs }],
+            next.imgs,
+          );
+        }, 0);
+      }
     }
   }
 
   function send() {
     const text = draft.trim();
-    if ((!text && attachments.length === 0) || streaming) return;
+    if (!text && attachments.length === 0) return;
     const imgs = attachments;
     setDraft('');
     setAttachments([]);
+    if (streaming) {
+      // 큐에 추가 — 현 턴 중단하고 새 메시지 즉시 처리
+      queueRef.current.push({ text, imgs });
+      setQueueCount(queueRef.current.length);
+      // 현재 런 중단 → runTurn finally 에서 큐 플러시. 플러시가 user 메시지 base 에 포함시킴.
+      // (race 방지: pre-append 안 함 — 현 turn loop 가 한 번 더 setLocal 해서 덮을 수 있음)
+      abortRef.current?.abort();
+      return;
+    }
     runTurn(
       text,
       [...messages, { role: 'user', content: text, attachments: imgs }],
@@ -354,6 +381,11 @@ export function ChatPanel({ panelId, projectId, initialMessage }: ChatPanelProps
       >
         {menuOpen && (
           <SkillMenu skills={filteredSkills} selectedIndex={skillIndex} onPick={pickSkill} />
+        )}
+        {queueCount > 0 && (
+          <div className="composer-queue" title="현 응답 끝나면 순서대로 전송됨">
+            ⏳ 메시지 {queueCount}개 대기 중
+          </div>
         )}
         {attachments.length > 0 && (
           <div className="composer-attachments">
