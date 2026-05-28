@@ -116,37 +116,17 @@ export function ProjectRail({
           +
         </button>
       </div>
-      <button
-        className="rail-settings"
-        onClick={onOpenKanban}
-        title="Kanban 보드 (Hermes tasks) — 토글"
-      >
-        📋
-      </button>
-      {isHermes && (
-        <>
-          <button
-            className="rail-settings"
-            onClick={onToggleChannel}
-            title="Hermes 채널 — 토글"
-          >
-            #
-          </button>
-          <button
-            className="rail-settings"
-            onClick={onOpenHermesConfig}
-            title="Hermes 전용 — 스킬 / 메모리"
-          >
-            🜲
-          </button>
-        </>
-      )}
-      <button className="rail-settings" onClick={onOpenSessions} title="세션 기록 (Claude/Codex)">
-        📜
-      </button>
-      <button className="rail-settings" onClick={onOpenSettings} title="설정">
-        ⚙
-      </button>
+      <div className="rail-actions">
+        <button className="rail-act" onClick={onOpenKanban} title="Kanban 보드 — 토글">📋</button>
+        {isHermes && (
+          <>
+            <button className="rail-act" onClick={onToggleChannel} title="Hermes 채널 — 토글">#</button>
+            <button className="rail-act" onClick={onOpenHermesConfig} title="Hermes 설정 — 스킬 / 메모리">🜲</button>
+          </>
+        )}
+        <button className="rail-act" onClick={onOpenSessions} title="세션 기록 (Claude/Codex)">📜</button>
+        <button className="rail-act" onClick={onOpenSettings} title="설정">⚙</button>
+      </div>
     </nav>
   );
 }

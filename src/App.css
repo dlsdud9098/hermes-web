@@ -610,6 +610,31 @@
 }
 .rail-settings:hover { color: var(--accent); border-color: var(--accent); }
 
+/* 레일 하단 액션 바 — 컴팩트 가로 배치, wrap */
+.rail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+}
+.rail-act {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.rail-act:hover { color: var(--accent); border-color: var(--accent); }
+
 .settings {
   width: 540px;
   height: 380px;
