@@ -1,13 +1,11 @@
-// Hermes 전용 설정 — 보유 스킬 리스트 + USER.md 메모리 편집.
-// 세션 기록 모달과 형식 통일 (overlay + dialog).
+// Hermes 전용 설정 — 보유 스킬 리스트 + 메모리(내장 파일 + 외부 provider).
 
 import { useCallback, useEffect, useState } from 'react';
 import { invoke, isTauri } from '../runtime';
+import { HermesMemoryTab } from './HermesMemoryTab';
 
 interface Skill { name: string; description: string; }
 interface SkillList { skills: Skill[]; }
-
-interface Memory { path: string; content: string; exists: boolean; }
 
 interface Props {
   onClose: () => void;
@@ -19,10 +17,6 @@ export function HermesConfigModal({ onClose }: Props) {
   const [tab, setTab] = useState<Tab>('skills');
   const [skills, setSkills] = useState<Skill[]>([]);
   const [filter, setFilter] = useState('');
-  const [memory, setMemory] = useState<Memory | null>(null);
-  const [draft, setDraft] = useState('');
-  const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,28 +33,7 @@ export function HermesConfigModal({ onClose }: Props) {
     } catch (e) { setErr(String(e)); }
   }, []);
 
-  const loadMemory = useCallback(async () => {
-    if (!isTauri) return;
-    try {
-      const m = await invoke<Memory>('hermes_memory_read');
-      setMemory(m);
-      setDraft(m.content);
-      setDirty(false);
-    } catch (e) { setErr(String(e)); }
-  }, []);
-
-  useEffect(() => { loadSkills(); loadMemory(); }, [loadSkills, loadMemory]);
-
-  async function saveMemory() {
-    if (!isTauri || saving) return;
-    setSaving(true);
-    try {
-      await invoke<void>('hermes_memory_write', { content: draft });
-      setDirty(false);
-      await loadMemory();
-    } catch (e) { setErr(String(e)); }
-    setSaving(false);
-  }
+  useEffect(() => { loadSkills(); }, [loadSkills]);
 
   const filtered = skills.filter((s) => {
     if (!filter) return true;
@@ -83,7 +56,7 @@ export function HermesConfigModal({ onClose }: Props) {
           <button
             className={`hermes-config-tab${tab === 'memory' ? ' active' : ''}`}
             onClick={() => setTab('memory')}
-          >🧠 메모리 (USER.md){dirty && ' *'}</button>
+          >🧠 메모리</button>
         </div>
         {err && <div className="hermes-config-err">⚠ {err}</div>}
         {tab === 'skills' ? (
@@ -105,28 +78,7 @@ export function HermesConfigModal({ onClose }: Props) {
             </div>
           </div>
         ) : (
-          <div className="hermes-config-body">
-            <div className="hermes-mem-meta">
-              {memory?.path}{memory && !memory.exists && ' (아직 없음 — 저장 시 생성)'}
-            </div>
-            <textarea
-              className="hermes-mem-editor"
-              value={draft}
-              onChange={(e) => { setDraft(e.target.value); setDirty(true); }}
-              placeholder="Hermes 가 매 대화에 참조할 사용자 메모. 마크다운."
-              spellCheck={false}
-            />
-            <div className="hermes-mem-bar">
-              <span className="hermes-mem-count">{draft.length} 자</span>
-              <button
-                className="btn"
-                onClick={saveMemory}
-                disabled={!dirty || saving}
-              >
-                {saving ? '저장 중…' : dirty ? '저장' : '변경 없음'}
-              </button>
-            </div>
-          </div>
+          <HermesMemoryTab setErr={setErr} />
         )}
       </div>
     </div>

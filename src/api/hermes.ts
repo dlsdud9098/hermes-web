@@ -136,6 +136,9 @@ export async function* streamRun(opts: StreamRunOptions): AsyncGenerator<RunEven
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Hermes-Session-Id': opts.sessionId,
+    // plugin-http 가 webview Origin 을 자동 부착 → 게이트웨이 CORS allowlist(비어있음) 가 403.
+    // 빈 Origin 으로 덮어쓰면 _origin_allowed 가 non-browser 클라이언트로 간주해 통과.
+    Origin: '',
     ...(key ? { Authorization: `Bearer ${key}` } : {}),
   };
 
@@ -216,6 +219,7 @@ export async function approveRun(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      Origin: '',
       ...(key ? { Authorization: `Bearer ${key}` } : {}),
     },
     body: JSON.stringify({ choice }),

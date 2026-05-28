@@ -338,12 +338,12 @@ function DirNode({ entry, depth, onOpenFile, parentDir }: DirNodeProps) {
           })();
         }}
       >
-        <span className="tree-caret">{open ? '▾' : '▸'}</span>
+        <span className={`tree-caret${open ? ' open' : ''}`}>▸</span>
         <span className="tree-ic">📁</span>
         {entry.name}{error && ' ⚠'}
       </button>
       {open && listing && (
-        <>
+        <div className="tree-children">
           {arrange(listing.dirs, settings).map((d) => (
             <DirNode key={d.path} entry={d} depth={depth + 1}
               onOpenFile={onOpenFile} parentDir={entry.path} />
@@ -352,7 +352,7 @@ function DirNode({ entry, depth, onOpenFile, parentDir }: DirNodeProps) {
             <FileRow key={f.path} entry={f} depth={depth + 1}
               onOpenFile={onOpenFile} parentDir={entry.path} />
           ))}
-        </>
+        </div>
       )}
     </>
   );

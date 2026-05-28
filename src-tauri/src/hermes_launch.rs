@@ -34,6 +34,9 @@ pub fn ensure_started(state: &HermesProcess) {
         .arg("run")
         .arg("--replace")        // 좀비 인스턴스 있으면 교체
         .arg("--accept-hooks")    // TTY 없으므로 훅 자동 승인
+        // 데스크톱 앱은 webview Origin 을 붙여 보냄 → 게이트웨이 CORS allowlist 가 막음.
+        // 로컬 단독 사용이므로 모든 Origin 허용 (key 인증은 그대로 유지됨).
+        .env("API_SERVER_CORS_ORIGINS", "*")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

@@ -29,6 +29,7 @@ urlencoding = "2"
 notify = "6"
 notify-debouncer-mini = "0.4"
 rusqlite = { version = "0.31", features = ["bundled"] }
+serde_yaml = "0.9"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

@@ -274,9 +274,21 @@ export function ChatPanel({ panelId, projectId, initialMessage }: ChatPanelProps
               {m.role === 'assistant' ? (
                 <>
                   {m.tools?.map((t, ti) => <ToolCard key={ti} tool={t} />)}
-                  {m.content
-                    ? <Markdown content={m.content} />
-                    : (streaming && !m.tools?.length ? '…' : null)}
+                  {m.content && <Markdown content={m.content} />}
+                  {streaming && i === messages.length - 1 && (
+                    <div className="typing-indicator" title="에이전트 작동 중">
+                      <span className="typing-dot" />
+                      <span className="typing-dot" />
+                      <span className="typing-dot" />
+                      <span className="typing-label">
+                        {m.tools?.some((t) => t.status === 'running')
+                          ? `${m.tools.find((t) => t.status === 'running')?.tool} 실행 중…`
+                          : m.tools?.length
+                            ? '응답 생성 중…'
+                            : '생각 중…'}
+                      </span>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>

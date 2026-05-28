@@ -348,7 +348,23 @@
   white-space: nowrap;
 }
 .tree-row:hover { background: var(--bg-bar); }
-.tree-caret { width: 10px; flex-shrink: 0; color: var(--text-dim); }
+.tree-caret {
+  width: 10px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+  display: inline-block;
+  transition: transform 0.16s ease;
+  transform-origin: 50% 50%;
+}
+.tree-caret.open { transform: rotate(90deg); }
+.tree-children {
+  overflow: hidden;
+  animation: treeExpand 0.16s ease;
+}
+@keyframes treeExpand {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .tree-ic { flex-shrink: 0; }
 .tree-file { color: var(--text-dim); }
 
@@ -2382,3 +2398,88 @@
 .diff-hunk { color: #7aa2f7; }
 .diff-meta { color: var(--text-dim); }
 .diff-ctx { color: var(--text); }
+
+/* ── Hermes 메모리 탭 ───────────────────────── */
+.mem-tab { gap: 14px; overflow-y: auto; }
+.mem-provider {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  background: var(--bg);
+}
+.mem-provider-head { font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.mem-provider-select {
+  width: 100%;
+  background: var(--bg-soft);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.mem-provider-note { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+.mem-provider-config { margin-top: 10px; }
+.mem-editor-block { display: flex; flex-direction: column; }
+.mem-editor-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.mem-editor-hint { font-size: 10px; color: var(--text-dim); font-weight: normal; }
+.hermes-mem-editor.mono { font-family: var(--mono, monospace); }
+.hermes-mem-count.over { color: #f7768e; font-weight: 600; }
+
+/* ── 메모리 provider 필드 폼 ─────────────────── */
+.mem-field { margin-bottom: 10px; }
+.mem-field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.mem-field-req { color: #f7768e; }
+.mem-field-url { font-size: 10px; color: var(--accent); text-decoration: none; font-weight: normal; }
+.mem-field-url:hover { text-decoration: underline; }
+.mem-field-input {
+  width: 100%;
+  background: var(--bg-soft);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.mem-field-input:focus { outline: none; border-color: var(--accent); }
+.mem-field-desc { font-size: 10px; color: var(--text-dim); margin-top: 3px; }
+
+/* ── 에이전트 작동 중 인디케이터 (Discord 식) ── */
+.typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  margin-top: 6px;
+  border-radius: 12px;
+  background: rgba(122,162,247,0.08);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: typingPulse 1.2s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.typing-dot:nth-child(3) { animation-delay: 0.36s; }
+.typing-label { margin-left: 4px; }
+@keyframes typingPulse {
+  0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
+  40% { opacity: 1; transform: scale(1); }
+}
